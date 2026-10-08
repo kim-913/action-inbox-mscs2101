@@ -1,6 +1,6 @@
 # Action Inbox — Project Execution Plan
 
-Status: local web P0 implementation candidate; live Google, approved paid-model evaluation, reminder-delivery decision, and deployment acceptance remain open (platform change approved 2026-10-07)
+Status: local web P0 implementation candidate; connected-planner direction approved 2026-10-07. One user's real Google sign-in/import is reported; all-user/deployment acceptance, approved paid-model evaluation, and reminder-delivery decision remain open.
 Course: MSCS2101-1 Software Engineering, Fall 2026  
 Team: four members; Member 1 is the primary software engineer  
 Target: browser-first course MVP and live demonstration on December 5, 2026
@@ -20,18 +20,22 @@ Target: browser-first course MVP and live demonstration on December 5, 2026
 
 **Working title:** Action Inbox
 
-Action Inbox converts actionable Gmail messages into user-approved tasks, reminders, and Google Calendar events. It keeps every suggestion linked to supporting source text and never creates an external calendar event without confirmation.
+Action Inbox is a source-linked connected planner. Consented imports feed an internal calendar/agenda with short descriptions, action items, due dates where supported, and original-source details. Automatically displaying an internal suggestion is not approval of a task and never authorizes an external calendar write.
 
 ### Product outcome
 
-A user can connect one Google account, synchronize recent email, review evidence-backed suggestions, approve a task or event, and track that work until it is completed or waiting for a reply.
+A user connects an available source, receives a bounded automatic import after consent, and sees supported dated items alongside a clearly labelled undated/review list. Proposed actions, approved/manual tasks, and existing external Calendar events stay distinct; event start times and message receipt times are not inferred deadlines. Due urgency is a transparent date comparison, not AI confidence or a claim about personal importance.
+
+Gmail and Google Calendar are the only currently configured provider capabilities, using the same Google connection. Outlook and Canvas are approved Phase 2 roadmap goals, not implemented or available connectors; official API permissions and missing setup prerequisites are in `docs/testing/connector-prerequisites.md`. Do not add pretend connection controls. Native structured assignment deadlines can eventually bypass AI, while unstructured Gmail action/deadline extraction still needs a configured, explicitly authorized extractor.
+
+The local application keeps AI API extraction disabled. Imported messages remain readable, but import alone does not classify them or invent actions/dates. The separate one-case ChatGPT website experiment is neither a backend integration nor a schema/accuracy acceptance pass.
 
 ### Primary demonstration scenario
 
 1. A test account receives an email requesting registration documents by a specific Friday.
-2. The user synchronizes Gmail.
-3. Action Inbox classifies the message as `Action Required`.
-4. It proposes an action and deadline and displays the exact supporting quotation.
+2. The user consents to Google connection; a bounded initial Gmail import starts automatically. Later refresh/retry is explicit.
+3. With an explicitly approved, configured extractor, Action Inbox classifies the message as `Action Required`.
+4. It displays a proposed action/deadline in the internal planner with the exact supporting quotations. With extraction disabled, it instead exposes the readable message and truthful unavailable-extraction state.
 5. The user edits or approves the proposal.
 6. The application creates an internal task and optional Google Calendar event/reminder.
 7. Re-synchronizing does not create duplicates.
@@ -46,7 +50,7 @@ A user can connect one Google account, synchronize recent email, review evidence
 - Categories: `Action Required`, `Read / Review`, and `Reference`.
 - Structured AI extraction of action, explicit deadline, confidence, and supporting quotation.
 - Server-side validation that supporting quotations occur in the source email.
-- Review, edit, approve, and reject flow before task or calendar creation.
+- Internal planner display may show proposed suggestions automatically. Review, edit, approve, and reject remain required before suggestion-to-task conversion; external Calendar creation always needs separate explicit confirmation.
 - Internal tasks with `Pending`, `Waiting for Reply`, and `Completed` states.
 - Manual task and reminder creation.
 - Reminder creation, editing, and cancellation metadata remain required. Delivery while the browser is closed is pending an explicit product decision; local Expo notifications are no longer an applicable implementation.
@@ -65,14 +69,25 @@ A user can connect one Google account, synchronize recent email, review evidence
 - Lightweight sync history screen.
 - Additional responsive web presentation polish.
 
+### Phase 2 — approved incremental roadmap, not current completion
+
+The user approved gradually extending the internal, Google-Calendar-like planner rather than requiring an external calendar. Detailed requirements and acceptance boundaries are maintained in `docs/requirements/phase-2.md`.
+
+1. Connect Outlook and Canvas through their official APIs after approved application/institution configuration and source-specific consent. Automatically import supported assignments and other source items with short descriptions, action items, dates, provenance, and source details; never scrape private browser sessions.
+2. Extend the internal calendar/agenda so due assignments, immediate-action work, flights, and other time-sensitive items have distinct date semantics and readable details. Native structured dates do not depend on paid AI; unstructured extraction remains subject to evidence and cost approval.
+3. Add explicitly opted-in notification choices, including reminders one or two days before assignments and appropriate immediate/time-sensitive alerts. Define permissions, browser-closed delivery, timezone changes, deduplication, cancellation, and observed delivery before claiming success.
+4. Evaluate SMS as an optional separately approved channel. This roadmap does not authorize a paid SMS account, phone-number collection, sending a message, provider registration, or spending. No enabled-looking SMS/notification controls should appear before real delivery exists.
+
+These goals do not silently pass or replace P0 AC-09: the existing reminder-delivery release criterion remains unresolved until its mechanism or replacement acceptance criterion is explicitly approved and verified. Current reminder controls store metadata only.
+
 ### Explicitly deferred
 
 - Public OAuth verification or public app-store distribution.
 - Continuous mobile background synchronization.
-- Push-notification infrastructure.
+- Notification transport deployment until the Phase 2 mechanism, permissions, and any cost are separately approved.
 - Attachments, OCR, or attachment-derived deadlines.
-- Outlook, Exchange, or multiple Google accounts.
-- Automatic task/event creation without review.
+- Exchange-specific behavior or multiple Google accounts beyond the approved Phase 2 Outlook/Canvas goals.
+- Automatic approved-task creation or external Calendar writes without review; internal proposed-item display is allowed.
 - Full bidirectional task synchronization.
 - Recurring-event authoring.
 - Shared/team task management.

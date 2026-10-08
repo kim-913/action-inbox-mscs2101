@@ -1,10 +1,16 @@
 # Action Inbox
 
-Action Inbox is a browser-first course project that turns actionable Gmail messages into evidence-backed suggestions. A user reviews every suggestion before the app creates a task or Google Calendar event. Reminder delivery is pending a product decision; stored in-app due metadata is not a delivered notification.
+Action Inbox is a browser-first, source-linked connected planner. Consented Gmail imports remain readable and feed an internal calendar/agenda with evidence-backed proposals when extraction is available. Proposals, approved/manual tasks, and existing external Calendar events remain distinct; an internal suggestion is not permission to create a task or external event. Reminder delivery remains pending: stored in-app due metadata is not a delivered notification.
 
 ## Status
 
-The repository is local-only. Do not add a remote or publish it without the project owner's approval. The browser/API implementation includes cookie-based Google login, durable Gmail synchronization, evidence-backed review, tasks, calendar approval, and retention controls. The application uses real provider adapters; local sanitized provider smoke is not live Google or paid-model acceptance. Google Web-client/test-account configuration, approved paid-model evaluation, and the reminder-delivery decision remain external gates. See `docs/architecture/api-contract.md` and `docs/architecture/deployment.md`.
+The repository is local-only. Do not add a remote or publish it without the project owner's approval. The browser/API implementation includes cookie-based Google login, bounded durable Gmail import, source review, tasks, an internal planner, explicit external Calendar approval, and retention controls. Google is locally configured and the user reported real sign-in/import; synthetic test evidence does not establish all-user Google or paid-model acceptance. Paid extraction remains disabled. See `docs/architecture/api-contract.md`, `docs/architecture/deployment.md`, and `docs/testing/p0-evidence.md` for the current observed checks and limits.
+
+### Approved Phase 2 direction
+
+The user approved incremental Outlook and Canvas connectors, a first-class internal calendar rather than requiring an external calendar, and optional reminders one or two days before assignments plus immediate/time-sensitive work such as flights. These are roadmap goals, not shipped integrations or delivery claims. Official API setup/consent is required; Canvas assignment dates can be native data, while event times are not automatically deadlines.
+
+Notification delivery and any SMS option need separate permission, mechanism, cost approval, and observed end-to-end delivery. No SMS provider, paid account, message send, or fake enabled control is authorized by the roadmap. Existing P0 AC-09 remains an explicit unresolved delivery criterion. See `docs/requirements/phase-2.md`, `docs/testing/connector-prerequisites.md`, and the authoritative `EXECUTION_PLAN.md`.
 
 ## Structure
 
@@ -23,6 +29,8 @@ The repository is local-only. Do not add a remote or publish it without the proj
 - A current browser for local web testing
 
 ## Local setup
+
+The already-configured user preview at 5173 is served by launchd from a verified **production build**, not HMR. Do not run the development commands below on top of those live ports. Use isolated development/test services and follow `docs/architecture/deployment.md` for deliberate verified updates; rebuilding with the synthetic API URL must never replace the user-facing build.
 
 ```bash
 npm install
@@ -57,6 +65,10 @@ For actual PostgreSQL integration, set `TEST_DATABASE_URL` when running tests. W
 
 The versioned 50-message anonymized evaluation set is `test-data/anonymized/v1/cases.json`. `npm run evaluate -- saved-predictions.json` evaluates saved outputs offline and records provenance; it does not call a model and passing deterministic fixtures does not establish real model accuracy.
 
-For reproducible local-only browser workflow smoke, run `TEST_DATABASE_URL=<disposable-local-database> npm run smoke:local-providers`, then the configured web app. This explicit **test harness**, separate from production startup, runs sanitized OAuth/Gmail/OpenAI/Calendar HTTP servers and the real API/database path. It must not be used as a deployment or claimed as live provider evidence.
+For reproducible local-only browser workflow smoke, use a separate disposable loopback `action_inbox_smoke` database (never the live preview on 55432) and run `TEST_DATABASE_URL=… npm run smoke:local-providers`. The harness API uses 3002 and expects a web app on 5174 built/configured with `VITE_API_URL=http://127.0.0.1:3002`. Extraction is disabled by default; `SMOKE_EXTRACTION=synthetic` uses only the loopback synthetic HTTP response provider. This explicit **test harness** exercises actual API/database paths and must not be used as a deployment or claimed as live provider evidence.
 
 No real OAuth credentials, tokens, raw private emails, or non-anonymized test data belong in this repository or the shared Drive folder.
+
+## Local commit discipline
+
+Commit one coherent working feature with its tests and documentation after centralized checks. Small logical commits are preferred to a giant eventual-publication commit, but tightly coupled navigation/styles/models must not be split into broken intermediate states. Stage explicit owned paths, exclude secrets/private profiles and unrelated user files, and preserve existing history. Do not amend/rebase earlier commits, add a remote, or publish without the owner's explicit request.
