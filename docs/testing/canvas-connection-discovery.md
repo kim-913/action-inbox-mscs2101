@@ -61,7 +61,7 @@ The user subsequently supplied and approved **`https://sofia.instructure.com`**.
 
 No authenticated Canvas API/tool became available through these public reads. No profile, feed, courses or assignments were fetched; no Canvas write or app change occurred.
 
-### Calendar-only options after user choice
+### Calendar-only options at the public-discovery stage
 
 The admin-free candidate is Canvas's documented personal calendar export, **not** a personal API token. It does not require an application developer key. Its presence for this Sofia user has **not** been observed; the Microsoft SSO redirect does not establish feed availability.
 
@@ -83,3 +83,9 @@ If subscription is elected, the concrete implementation boundary is a secure app
 ### Full Canvas application route
 
 For full OAuth integration, the application owner can ask **helpdesk@sofia.edu** to route an inquiry to the Canvas administrator: whether an existing enabled scoped API developer key may be used for this read-only course project, which GET scopes are approved, and which exact application callback must be registered. Client secrets belong only in approved secure server configuration. Public discovery neither proves an existing key nor predicts institutional approval. No request, registration, key creation or approval was performed.
+
+## Subsequent user election and implementation boundary
+
+The user's later screenshot confirmed **Calendar Feed is available**, and they explicitly elected an ongoing **calendar-only subscription**. This supersedes the availability/consent questions and optional file-based trial above. The chosen handoff is now the application's authenticated **Connections → Canvas** secure input—not chat, a command argument, or a pasted URL in documentation. The real private URL has still not been supplied or fetched by an agent.
+
+The implementation uses native feed assignment/event metadata, manual refresh, encrypted per-user storage and a separate Canvas planner source. Pinned upstream conventions and handcrafted fixtures are in `../../test-data/canvas/README.md`; route/security/coverage limits are in `../architecture/api-contract.md` and `../architecture/deployment.md`. These include date-only assignments with no recoverable exact due time, bounded provider coverage, and no grade/submission/completion guarantee. A synthetic successful import is not evidence that the user's real feed has connected. Full institution OAuth remains a separate future integration requiring actual application credentials and consent.

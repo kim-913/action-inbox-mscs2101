@@ -22,6 +22,7 @@ import { EmailDetail, Inbox } from "./Inbox";
 import { Tasks } from "./Tasks";
 import { Calendar } from "./Calendar";
 import { Planner } from "./PlannerPage";
+import { CanvasConnectionCard } from "./CanvasFeed";
 import { ActionNotice, ErrorNotice, useAction } from "./ui";
 
 type Page =
@@ -481,6 +482,7 @@ function Account({
             configured.
           </p>
         </article>
+        <CanvasConnectionCard api={api} />
       </div>
       <h2>Browser session and retained data</h2>
       <p>

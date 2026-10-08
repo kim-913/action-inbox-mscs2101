@@ -1604,3 +1604,71 @@ dd {
     margin-top: 0;
   }
 }
+
+.canvas-connection {
+  grid-column: 1 / -1;
+}
+.canvas-connection > form {
+  max-width: 700px;
+}
+.canvas-connection .capability-list {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+.canvas-connection-status {
+  margin: 20px 0 12px;
+  padding: 15px 17px;
+  background: #faf7f2;
+  border-radius: 8px;
+}
+.canvas-connection-status p {
+  margin-bottom: 7px;
+}
+.canvas-connection-status p:last-child {
+  margin-bottom: 0;
+}
+.pill.canvas,
+.day-preview.canvas {
+  color: #996c43;
+  background: #f8efe4;
+}
+.calendar-legend .legend-canvas {
+  background: #c7a27a;
+}
+.canvas-preview {
+  white-space: pre-line;
+  font-size: 11px;
+  color: #8e958b;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.canvas-details {
+  border-top: 1px solid var(--line);
+  margin-top: 12px;
+  font-size: 11px;
+  color: #7d8977;
+}
+.canvas-details > summary {
+  cursor: pointer;
+  padding: 12px 0;
+  color: #637b57;
+  font-weight: 550;
+}
+.canvas-description {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.7;
+}
+.canvas-details dd {
+  color: #63775c;
+  font-size: 11px;
+}
+@media (max-width: 760px) {
+  .canvas-connection .capability-list {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+}

@@ -538,6 +538,17 @@ describe("P0 browser interactions", () => {
         });
       if (path === "/v1/tasks")
         return Response.json({ items: [], nextCursor: null });
+      if (path === "/v1/canvas/connection")
+        return Response.json({
+          connected: false,
+          host: "sofia.instructure.com",
+          status: "Disconnected",
+          itemCount: 0,
+          lastSuccessfulFetchAt: null,
+          error: null,
+          refreshPolicy: "Manual",
+          coverage: "Calendar feed only.",
+        });
       if (path === "/v1/calendar/upcoming")
         return Response.json({
           items: [],

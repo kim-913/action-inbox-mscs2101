@@ -17,6 +17,16 @@ const sourceId = "10000000-0000-4000-8000-000000000001";
 const taskId = "20000000-0000-4000-8000-000000000001";
 const timestamp = new Date().toISOString();
 const due = new Date(new Date().setHours(18, 0, 0, 0)).toISOString();
+const canvasDisconnected = {
+  connected: false,
+  host: "sofia.instructure.com",
+  status: "Disconnected",
+  itemCount: 0,
+  lastSuccessfulFetchAt: null,
+  error: null,
+  refreshPolicy: "Manual",
+  coverage: "Calendar feed only.",
+};
 const email: EmailSummary = {
   id: sourceId,
   gmailMessageId: "fixture",
@@ -85,6 +95,8 @@ describe("planner interactions", () => {
           ],
           nextCursor: null,
         });
+      if (path === "/v1/canvas/connection")
+        return Response.json(canvasDisconnected);
       if (path === "/v1/calendar/upcoming")
         return Response.json({
           items: [],
@@ -156,6 +168,8 @@ describe("planner interactions", () => {
         });
       if (address.pathname === "/v1/tasks")
         return Response.json({ items: [], nextCursor: null });
+      if (address.pathname === "/v1/canvas/connection")
+        return Response.json(canvasDisconnected);
       if (address.pathname === "/v1/calendar/upcoming")
         return Response.json({
           items: [],

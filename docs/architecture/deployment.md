@@ -6,7 +6,7 @@ The API runs health-only without `DATABASE_URL`; this is not a simulated P0 back
 
 The genuine application is configured at **http://127.0.0.1:5173/**, with the API at `http://127.0.0.1:3000`. Ordinary users only click **Connect Google account** and sign in through Arc; they do not need to configure Google Cloud. Local Web-client setup evidence is recorded separately in `docs/testing/google-setup-evidence.md`. The setup smoke observed anonymous session and authorization-URL creation. Subsequently, the user's screenshot reported successful real sign-in and Gmail import in progress; this was user-performed, not an agent-performed mailbox inspection or paid-model test.
 
-The application uses a separate persistent Docker container `action-inbox-postgres` and named volume `action-inbox-postgres-data`. PostgreSQL listens only at `127.0.0.1:55432`, uses a generated password and SCRAM host authentication, and has all five application migrations applied. Existing unrelated containers/databases were not replaced or modified. Do not delete the named volume unless intentionally deleting application data.
+The application uses a separate persistent Docker container `action-inbox-postgres` and named volume `action-inbox-postgres-data`. PostgreSQL listens only at `127.0.0.1:55432`, uses a generated password and SCRAM host authentication, and has all six application migrations applied, including the independent Canvas subscription table. Existing unrelated containers/databases were not replaced or modified. Do not delete the named volume unless intentionally deleting application data.
 
 Private local settings are in ignored mode-0600 `.env`, `apps/web/.env`, `.env.google-web`, and `.local-preview/postgres.env`. The generated AES key is preserved in `.env`; replacing it makes previously encrypted provider tokens unreadable. Do not publish, paste, or commit these files. `OPENAI_ENABLED=false` remains set: this local preview does not enable paid model calls or paid cloud infrastructure.
 
@@ -66,6 +66,16 @@ For the current local preview, Gmail and Google Calendar APIs are enabled and th
 
 A future hosted deployment still needs its chosen HTTPS callback, such as `https://api.your-domain.example/v1/auth/google/callback`, registered on the Web client and configured as `GOOGLE_REDIRECT_URI`. Supply `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_ALLOWED_EMAILS`, `TOKEN_ENCRYPTION_KEY`, `DATABASE_URL`, and `WEB_ORIGIN` through private deployment configuration, and set `VITE_API_URL` at browser build time. The example hostname is illustrative; no public hosting or paid infrastructure was provisioned.
 
+## Canvas calendar feed
+
+The user-approved Sofia integration is a read-only private calendar subscription, not institutional Canvas OAuth. It needs no developer key and does not use OpenAI, but the user must paste their real Calendar Feed link into the authenticated app's secure Connections input. Never ask for that full URL in chat or include it in logs/screenshots. A visible Calendar Feed control establishes availability, not that this application's first read succeeded.
+
+The server accepts only `https://sofia.instructure.com/feeds/calendars/user_<opaque>.ics` with no credentials, custom port, query, fragment, or redirects. Public DNS answers are checked and the HTTPS connection is pinned to a validated address while retaining hostname certificate verification. There is no environment variable or public parameter to bypass this production destination policy. Existing `TOKEN_ENCRYPTION_KEY` encrypts the URL with user/connection-bound AES-GCM; preserve it alongside the database. Account deletion cascades the subscription/snapshot; Canvas disconnect removes local content without pretending to revoke the provider's feed URL. Google disconnect does not remove Canvas.
+
+Initial connect and explicit manual Refresh are the only reads. The bounded importer accepts UTF-8 `text/calendar`, identity encoding, at most 2 MiB and 1,000 events, and a 15-second total network deadline. Unsupported or incomplete data fails safely without replacing the last successful snapshot. Event recurrence rules/exclusions/duration and floating/unknown timezones are not silently expanded or guessed; component-local ordinary embedded timezones and native date-only/UTC timestamps are supported. These deliberate parser limits are not claims about all possible iCalendar producers.
+
+Canvas limits the source's date window and result set independently of this app. Imported snapshot removal means only that an item is no longer in the current feed, not that coursework was completed or cancelled. Date-only assignments do not supply an exact due time. Grades, submissions and completion state are not imported. No external task/calendar write or notification delivery is triggered. Source descriptions are inert plain text and returned links cannot expose a feed URL.
+
 ## OpenAI cost boundary
 
 `OPENAI_ENABLED` defaults to `false`. Merely inheriting an `OPENAI_API_KEY` does not activate paid calls. Set `OPENAI_ENABLED=true` and provide a key only after the account owner explicitly approves usage and cost. `OPENAI_MODEL` defaults to `gpt-4.1-mini`. Disabled/missing provider configuration produces a visible safe extraction failure, not fabricated suggestions. Local provider-contract tests use synthetic HTTP responses and do not prove real model accuracy. The versioned evaluation harness must disclose which provider/predictions were actually evaluated.
@@ -78,7 +88,7 @@ Successful new Google consent now atomically queues one initial import of at mos
 
 ## Reminders and retained data
 
-Reminder endpoints store in-app due metadata only. They do not schedule or deliver notifications and must never be presented as doing so. AC-09 remains pending a delivery decision. Disconnect/delete performs real Google revocation before deletion; only definitive, bounded `invalid_token` evidence counts as already revoked. Unknown provider failures remain visible and preserve data for retry. Workers require the original running sync and connection identity before every persistence step, preventing stale pre-disconnect responses from restoring deleted content after reconnect.
+Reminder endpoints store in-app due metadata only. They do not schedule or deliver notifications and must never be presented as doing so. AC-09 remains pending a delivery decision. Google disconnect/account deletion performs real Google revocation when a live Google connection exists; only definitive, bounded `invalid_token` evidence counts as already revoked. Unknown provider failures remain visible and preserve data for retry. Gmail workers require the original running sync and connection identity before every persistence step. Canvas refresh similarly requires its original connection and operation generation, preventing stale pre-disconnect responses from restoring deleted content after reconnect.
 
 Reminder options requiring an explicit user decision:
 
@@ -103,6 +113,8 @@ VITE_API_URL=http://127.0.0.1:3002 npm run build --workspace @action-inbox/web -
 npm run preview --workspace @action-inbox/web -- --outDir ../../.local-preview/smoke-dist --port 5174 --strictPort
 ```
 
-These are future rehearsal commands; the recorded redesign rehearsal happened before the user process was switched from HMR to the final 3000-configured production build.
+The redesign rehearsal preceded the stable user preview. Subsequent Canvas rehearsals use this separate output directory rather than overwriting the live application.
 
 The harness serves six delayed synthetic messages so incremental import is observable. Extraction is disabled by default, reproducing the local preview's no-paid-model behavior. `SMOKE_EXTRACTION=synthetic` explicitly enables only the harness's loopback synthetic HTTP response provider; it never enables real OpenAI access. Both modes use synthetic OAuth/Gmail/Calendar endpoints and a fresh browser profile. Do not attach this rehearsal to the user's private browser session or capture screenshots of their real mailbox.
+
+The Canvas browser fixture is also a real local HTTP response, parsed by the same importer and persisted through the real authenticated routes. Only the explicit test harness injects that reader; production always uses pinned Sofia HTTPS. Synthetic mode controls under `/__smoke/` exist only in `testing/browser-smoke.ts`, never in `server.ts`. The fixture can change dates/remove items or return an outage to exercise manual refresh and last-success retention. Transport DNS/TLS policy is covered separately by focused adapter tests; a loopback fixture is not proof of live Sofia access.

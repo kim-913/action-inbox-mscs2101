@@ -6,6 +6,9 @@ import {
 } from "@tanstack/react-query";
 import {
   apiRoutes,
+  canvasConnectionSchema,
+  canvasItemsResponseSchema,
+  canvasRoutes,
   inboxResponseSchema,
   syncRunSchema,
   tasksResponseSchema,
@@ -19,6 +22,11 @@ import {
 } from "./api/client";
 import { ErrorNotice, displayDate, useNow } from "./ui";
 import { dueUrgency } from "./urgency";
+import {
+  CanvasSourceDetails,
+  canvasError,
+  canvasConnectionLabel,
+} from "./CanvasFeed";
 import {
   needsDate,
   plannerDates,
@@ -80,6 +88,23 @@ export function Planner({
         signal,
       }),
   });
+  const canvasConnection = useQuery({
+    queryKey: ["private", "canvas", "connection"],
+    queryFn: ({ signal }) =>
+      api.request(canvasRoutes.connection, canvasConnectionSchema, { signal }),
+  });
+  const canvas = useInfiniteQuery({
+    queryKey: ["private", "canvas", "items"],
+    enabled: canvasConnection.data?.connected === true,
+    initialPageParam: null as string | null,
+    queryFn: ({ pageParam, signal }) =>
+      api.request(
+        `${canvasRoutes.items}?limit=100${pageParam ? `&cursor=${encodeURIComponent(pageParam)}` : ""}`,
+        canvasItemsResponseSchema,
+        { signal },
+      ),
+    getNextPageParam: (page) => page.nextCursor ?? undefined,
+  });
   const latest = mail.data?.pages[0]?.dataState.latestSyncRun;
   const run = useQuery({
     queryKey: ["private", "sync", latest?.id, watch],
@@ -116,7 +141,15 @@ export function Planner({
   ]);
   const emails = mail.data?.pages.flatMap((page) => page.items) ?? [];
   const savedTasks = tasks.data?.pages.flatMap((page) => page.items) ?? [];
-  const entries = plannerItems(emails, savedTasks, calendar.data?.items ?? []);
+  const canvasItems = canvasConnection.data?.connected
+    ? (canvas.data?.pages.flatMap((page) => page.items) ?? [])
+    : [];
+  const entries = plannerItems(
+    emails,
+    savedTasks,
+    calendar.data?.items ?? [],
+    canvasItems,
+  );
   const undated = entries.filter(needsDate);
   const reviews = entries.filter((item) => item.kind === "suggestion");
   const weekStart = new Date(
@@ -163,8 +196,13 @@ export function Planner({
       (email) => email.extractionError?.code === "PROVIDER_NOT_CONFIGURED",
     );
   const calendarError = calendar.data?.error;
-  const more = mail.hasNextPage || tasks.hasNextPage;
-  const loaded = Boolean(mail.data && tasks.data);
+  const more = mail.hasNextPage || tasks.hasNextPage || canvas.hasNextPage;
+  const loaded = Boolean(
+    mail.data &&
+    tasks.data &&
+    canvasConnection.data &&
+    (!canvasConnection.data.connected || canvas.data),
+  );
   function changeWeek(offset: number) {
     setWeekOffset(offset);
     const start = new Date(
@@ -192,6 +230,8 @@ export function Planner({
               void mail.refetch();
               void tasks.refetch();
               if (connected) void calendar.refetch();
+              void canvasConnection.refetch();
+              if (canvasConnection.data?.connected) void canvas.refetch();
             }}
           >
             Refresh plan
@@ -219,6 +259,8 @@ export function Planner({
                     ? `${emails.length} source messages loaded`
                     : "No source messages loaded yet"}
         </span>
+        <span className="status-divider" />
+        <span>Canvas: {canvasConnectionLabel(canvasConnection.data)}</span>
         <button className="text-button" onClick={openConnections}>
           Connections
         </button>
@@ -282,6 +324,30 @@ export function Planner({
             : null
         }
       />
+      <ErrorNotice error={canvasError(canvasConnection.error)} />
+      <ErrorNotice error={canvasError(canvas.error)} />
+      {canvasConnection.data?.error && (
+        <ErrorNotice
+          error={canvasError(
+            new RequestError(
+              "Canvas refresh failed.",
+              canvasConnection.data.error.code,
+              canvasConnection.data.error.requestId,
+            ),
+          )}
+        />
+      )}
+      {canvasConnection.data?.connected && (
+        <p className="inline-note">
+          Canvas dates are native feed data; they do not require AI. Refresh is
+          manual in{" "}
+          <button className="text-button" onClick={openConnections}>
+            Connections
+          </button>
+          . Last successful Canvas import:{" "}
+          {displayDate(canvasConnection.data.lastSuccessfulFetchAt)}.
+        </p>
+      )}
       <div className="planner-metrics">
         <span>
           <strong>{loaded ? overdue : "—"}</strong> overdue tasks
@@ -356,6 +422,10 @@ export function Planner({
           <span>
             <i className="legend-event" />
             Google Calendar time
+          </span>
+          <span>
+            <i className="legend-canvas" />
+            Canvas native dates
           </span>
         </div>
         <div className="week-grid">
@@ -481,7 +551,8 @@ export function Planner({
           </p>
           {undated.length === 0 && loaded && (
             <p className="empty-small">
-              No undated tasks or suggestions in the loaded plan.
+              No undated items in the loaded plan. Canvas does not supply all
+              undated coursework through its calendar feed.
             </p>
           )}
           {undated.map((item) => (
@@ -516,6 +587,15 @@ export function Planner({
           Last Calendar fetch:{" "}
           {displayDate(calendar.data?.lastSuccessfulFetchAt ?? null)}.
         </p>
+        <p>
+          {canvasConnection.data?.connected
+            ? `${canvasItems.length} loaded Canvas entries of ${canvasConnection.data.itemCount} imported. Cancelled entries are excluded from the plan.`
+            : canvasConnection.data
+              ? "No Canvas calendar feed is connected."
+              : "Canvas connection status is not yet available."}{" "}
+          Canvas feed coverage does not include all undated work, grades,
+          submissions or completion status.
+        </p>
         <div className="actions">
           {mail.hasNextPage && (
             <button
@@ -533,6 +613,15 @@ export function Planner({
               onClick={() => void tasks.fetchNextPage()}
             >
               Load more tasks
+            </button>
+          )}
+          {canvas.hasNextPage && (
+            <button
+              className="secondary small"
+              disabled={canvas.isFetchingNextPage}
+              onClick={() => void canvas.fetchNextPage()}
+            >
+              Load more Canvas entries
             </button>
           )}
         </div>
@@ -572,13 +661,17 @@ function PlannerRow({
     <article className={`planner-row ${item.kind}`}>
       <div className="planner-row-heading">
         <span
-          className={`pill ${item.kind === "suggestion" ? "review" : item.kind === "event" ? "event" : urgency!.tone}`}
+          className={`pill ${item.kind === "canvas" ? "canvas" : item.kind === "suggestion" ? "review" : item.kind === "event" ? "event" : urgency!.tone}`}
         >
-          {item.kind === "suggestion"
-            ? "Needs review"
-            : item.kind === "event"
-              ? "Google Calendar · read only"
-              : urgency!.label}
+          {item.kind === "canvas"
+            ? item.canvas.kind === "Assignment"
+              ? "Canvas assignment · native due"
+              : "Canvas event · read only"
+            : item.kind === "suggestion"
+              ? "Needs review"
+              : item.kind === "event"
+                ? "Google Calendar · read only"
+                : urgency!.label}
         </span>
         {item.kind === "task" && item.task.status === "Waiting for Reply" && (
           <span className="category-label">Waiting for reply</span>
@@ -586,25 +679,33 @@ function PlannerRow({
       </div>
       <h3>{item.title}</h3>
       <p className="planner-source">
-        {item.kind === "event"
-          ? "Scheduled event — not a task deadline"
-          : item.kind === "suggestion"
-            ? `Gmail · ${item.source.subject || "Source email"}`
-            : item.task.sourceEmailId
-              ? `Approved task · ${item.source?.subject || "Source email"}`
-              : "Manual task · added by you"}
+        {item.kind === "canvas"
+          ? "Sofia Canvas · calendar feed"
+          : item.kind === "event"
+            ? "Scheduled event — not a task deadline"
+            : item.kind === "suggestion"
+              ? `Gmail · ${item.source.subject || "Source email"}`
+              : item.task.sourceEmailId
+                ? `Approved task · ${item.source?.subject || "Source email"}`
+                : "Manual task · added by you"}
       </p>
       {dates.length ? (
         <div className="planner-dates">
           {dates.map((date, index) => (
             <p key={`${date.meaning}:${index}`}>
               <strong>{date.meaning}:</strong>{" "}
-              {date.allDay ? `${date.at} · all day` : displayDate(date.at)}
+              {date.allDay
+                ? `${date.at} · ${item.kind === "canvas" ? "date only; no exact time supplied" : "all day"}`
+                : displayDate(date.at)}
             </p>
           ))}
         </div>
       ) : (
-        <p className="planner-dates">No due date set.</p>
+        <p className="planner-dates">
+          {item.kind === "canvas"
+            ? "No date supplied in this feed entry."
+            : "No due date set."}
+        </p>
       )}
       {item.kind === "suggestion" &&
         item.suggestion.deadlineCertainty === "Uncertain" && (
@@ -613,6 +714,14 @@ function PlannerRow({
             deadline.
           </p>
         )}
+      {item.kind === "canvas" && (
+        <>
+          {item.canvas.description && (
+            <p className="canvas-preview">{item.canvas.description}</p>
+          )}
+          <CanvasSourceDetails item={item.canvas} />
+        </>
+      )}
       <div className="planner-row-actions">
         {item.kind === "suggestion" ? (
           <button

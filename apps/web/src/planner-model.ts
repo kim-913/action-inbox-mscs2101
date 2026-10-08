@@ -1,5 +1,6 @@
 import type {
   CalendarEvent,
+  CanvasItem,
   EmailSummary,
   Suggestion,
   Task,
@@ -21,17 +22,24 @@ export type PlannerItem =
       suggestion: Suggestion;
       source: EmailSummary;
     }
-  | { kind: "event"; key: string; title: string; event: CalendarEvent };
+  | { kind: "event"; key: string; title: string; event: CalendarEvent }
+  | { kind: "canvas"; key: string; title: string; canvas: CanvasItem };
 export type PlannerDate = {
   at: string;
   allDay: boolean;
-  meaning: "Task deadline" | "Unconfirmed date" | "Calendar time";
+  meaning:
+    | "Task deadline"
+    | "Unconfirmed date"
+    | "Calendar time"
+    | "Canvas due date"
+    | "Canvas event time";
 };
 
 export function plannerItems(
   emails: EmailSummary[],
   tasks: Task[],
   events: CalendarEvent[],
+  canvasItems: CanvasItem[] = [],
 ): PlannerItem[] {
   const sources = new Map(emails.map((email) => [email.id, email]));
   const eventsById = new Map(events.map((event) => [event.id, event]));
@@ -79,10 +87,34 @@ export function plannerItems(
         event,
       });
   }
+  for (const item of new Map(
+    canvasItems.map((item) => [item.id, item]),
+  ).values()) {
+    if (!item.cancelled)
+      result.push({
+        kind: "canvas",
+        key: `canvas:${item.id}`,
+        title: item.title || "Untitled Canvas entry",
+        canvas: item,
+      });
+  }
   return result;
 }
 
 export function plannerDates(item: PlannerItem): PlannerDate[] {
+  if (item.kind === "canvas")
+    return item.canvas.start
+      ? [
+          {
+            at: item.canvas.start.value,
+            allDay: item.canvas.start.kind === "date",
+            meaning:
+              item.canvas.kind === "Assignment"
+                ? "Canvas due date"
+                : "Canvas event time",
+          },
+        ]
+      : [];
   if (item.kind === "event")
     return [
       {
@@ -139,5 +171,6 @@ export function plannerSortTime(date: PlannerDate): number {
 
 export function needsDate(item: PlannerItem): boolean {
   if (item.kind === "event") return false;
+  if (item.kind === "canvas") return !item.canvas.start;
   return !(item.kind === "task" ? item.task.dueAt : item.suggestion.dueAt);
 }

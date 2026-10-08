@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type {
   CalendarEvent,
+  CanvasItem,
   EmailSummary,
   Suggestion,
   Task,
@@ -197,5 +198,77 @@ describe("connected planner semantics", () => {
     } finally {
       vi.unstubAllEnvs();
     }
+  });
+
+  it("keeps native Canvas due dates distinct from event times and excludes cancellation without guessing completion", () => {
+    const assignment: CanvasItem = {
+      id: "canvas-assignment-1",
+      kind: "Assignment",
+      title: "Assignment [COURSE]",
+      description: "Native source",
+      sourceUrl: null,
+      start: { value: "2026-10-09", kind: "date", timeZone: null },
+      end: null,
+      cancelled: false,
+    };
+    const canvasEvent: CanvasItem = {
+      ...assignment,
+      id: "canvas-event-1",
+      kind: "Event",
+      title: "Class meeting",
+      start: {
+        value: "2026-10-10T10:00:00Z",
+        kind: "instant",
+        timeZone: "UTC",
+      },
+    };
+    const cancelled = { ...assignment, id: "cancelled", cancelled: true };
+    const items = plannerItems(
+      [],
+      [],
+      [],
+      [assignment, canvasEvent, cancelled],
+    );
+    expect(items).toHaveLength(2);
+    expect(items.every((item) => item.kind === "canvas")).toBe(true);
+    expect(plannerDates(items[0]!)).toEqual([
+      { at: "2026-10-09", allDay: true, meaning: "Canvas due date" },
+    ]);
+    expect(plannerDates(items[1]!)).toEqual([
+      {
+        at: "2026-10-10T10:00:00Z",
+        allDay: false,
+        meaning: "Canvas event time",
+      },
+    ]);
+  });
+
+  it("replaces a changed Canvas date under the stable source id without creating a task or duplicate item", () => {
+    const original: CanvasItem = {
+      id: "canvas-stable",
+      kind: "Assignment",
+      title: "Source title",
+      description: "",
+      sourceUrl: null,
+      start: { value: "2026-10-09", kind: "date", timeZone: null },
+      end: null,
+      cancelled: false,
+    };
+    const changed: CanvasItem = {
+      ...original,
+      start: { value: "2026-10-12", kind: "date", timeZone: null },
+    };
+    const items = plannerItems([], [], [], [original, changed]);
+    expect(items).toHaveLength(1);
+    expect(items[0]?.key).toBe("canvas:canvas-stable");
+    expect(plannerDates(items[0]!)[0]?.at).toBe("2026-10-12");
+    const missing = plannerItems(
+      [],
+      [],
+      [],
+      [{ ...original, start: null }],
+    )[0]!;
+    expect(needsDate(missing)).toBe(true);
+    expect(plannerDates(missing)).toEqual([]);
   });
 });

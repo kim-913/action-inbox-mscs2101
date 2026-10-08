@@ -80,6 +80,12 @@ The user approved gradually extending the internal, Google-Calendar-like planner
 
 These goals do not silently pass or replace P0 AC-09: the existing reminder-delivery release criterion remains unresolved until its mechanism or replacement acceptance criterion is explicitly approved and verified. Current reminder controls store metadata only.
 
+#### Approved Canvas calendar-only increment
+
+After confirming Sofia Canvas exposes Calendar Feed, the user explicitly chose an ongoing read-only calendar subscription as the first Canvas connection. This is not a substitute claim for full Canvas OAuth: private course, grade, submission and completion APIs still require future setup/consent. The current implementation accepts the secret link only through authenticated app input, encrypts it server-side, imports native assignment due/event dates without AI, and supports initial/manual refresh with source-specific paging and last-success retention. The user must still provide their own link in the app before real-feed access can be observed.
+
+No imported item automatically creates an approved task, writes an external calendar, or delivers a notification. Date-only assignment feeds cannot establish an exact due clock time. The source has bounded date coverage; the app rejects more than 1,000 events instead of silently truncating. Disappearance from a snapshot is not completion. Full Outlook/Canvas OAuth and reminder channels remain planned, and AC-09 remains unchanged.
+
 ### Explicitly deferred
 
 - Public OAuth verification or public app-store distribution.
@@ -128,6 +134,7 @@ If schedule pressure occurs, cut P1 first. Do not weaken approval, evidence, dup
 | Job processing         | `pg-boss` backed by PostgreSQL                                                                                            | Retryable sync/extraction work without operating Redis.                                        |
 | AI extraction          | OpenAI Responses API structured output behind an `Extractor` interface                                                    | Schema-constrained output and a replaceable provider boundary.                                 |
 | Google integration     | Gmail API and Google Calendar API via backend-owned OAuth flow                                                            | Tokens remain off the device and integration behavior is centralized.                          |
+| Canvas calendar feed   | Maintained iCalendar parser behind pinned Sofia HTTPS, encrypted per-user subscription and bounded snapshots              | Native calendar dates without AI; explicit calendar-only consent, no provider writes.          |
 | Reminders              | Durable reminder metadata; delivery decision pending                                                                      | No claim of reliable closed-browser delivery and no unapproved push/email infrastructure.      |
 | Unit/integration tests | Vitest, React Testing Library, PostgreSQL test database                                                                   | Fast deterministic tests around behavior and constraints.                                      |
 | End-to-end smoke       | Local Playwright/browser tooling on the designated browser                                                                | Exercises the actual web interaction path; no Google UI writes.                                |
