@@ -50,13 +50,11 @@ Missing locally: the institution-approved HTTPS Canvas origin, an enabled scoped
 
 Recommended minimal read scope selection (enable only endpoints the adapter actually calls):
 
-| Purpose                                                      | OAuth scope |
-| ------------------------------------------------------------ | ----------- |
-| Current user's planner feed                                  | `url:GET    | /api/v1/planner/items`                      |
-| User's active courses for course labels/assignment discovery | `url:GET    | /api/v1/courses`                            |
-| Course assignments including undated assignments             | `url:GET    | /api/v1/courses/:course_id/assignments`     |
-| Assignment details when not already included                 | `url:GET    | /api/v1/courses/:course_id/assignments/:id` |
-| Separate planner-note listing, only if needed                | `url:GET    | /api/v1/planner_notes`                      |
+- Current user's planner feed: `url:GET|/api/v1/planner/items`
+- User's active courses for course labels/assignment discovery: `url:GET|/api/v1/courses`
+- Course assignments including undated assignments: `url:GET|/api/v1/courses/:course_id/assignments`
+- Assignment details when not already included: `url:GET|/api/v1/courses/:course_id/assignments/:id`
+- Separate planner-note listing, only if needed: `url:GET|/api/v1/planner_notes`
 
 Endpoint evidence: [courses](https://developerdocs.instructure.com/services/canvas/resources/courses), [assignments](https://developerdocs.instructure.com/services/canvas/resources/assignments), [planner](https://developerdocs.instructure.com/services/canvas/resources/planner). Scope strings encode the literal documented route template, not a concrete course ID. Requested scopes must be a subset of the key's administrator-approved scopes; scoping does not grant a user access to otherwise inaccessible courses. Request no submission, grade, planner-note, or planner-override write scopes. The key's **Allow Include Parameters** setting controls whether scoped calls honor `include`/`includes`; do not depend silently on `include[]=submission` for completion status.
 
