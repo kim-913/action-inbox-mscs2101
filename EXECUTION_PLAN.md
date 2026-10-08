@@ -7,11 +7,11 @@ Target: browser-first course MVP and live demonstration on December 5, 2026
 
 ## 1. Operating constraints
 
-- All project files remain in `/Users/ziruoke/Project/mscs2101` and the team’s dedicated Google Drive folder for now.
+- Authoritative source and sanitized technical documentation are maintained in the private repository `kim-913/mscs2101`; local work remains in `/Users/ziruoke/Project/mscs2101`, with course artifacts also maintained in the team's dedicated Google Drive folder.
 - Do not create, publish, or connect a public GitHub repository until the team explicitly decides to do so.
 - Do not submit, post, message, or modify anything in Canvas without the user’s explicit confirmation for that specific action.
 - Do not use browser UI automation for Canvas, Google Drive, or Google Docs. Use the authenticated local Google Workspace MCP integration; any unavoidable interactive sign-in must use the user's default Arc browser.
-- Development may use local source control later, but remote publication is outside this plan.
+- Private GitHub publication was authorized on 2026-10-08. Follow the canonical branch/PR policy in [CONTRIBUTING.md](CONTRIBUTING.md); public publication remains unauthorized.
 - The application is a classroom web MVP for four named test users, not a public release.
 - The team will use Google OAuth testing mode and pre-register all test accounts.
 - The product is browser-first, using React. Native mobile builds and Expo are outside the revised platform scope.
@@ -124,21 +124,21 @@ If schedule pressure occurs, cut P1 first. Do not weaken approval, evidence, dup
 
 ### Selected stack
 
-| Area                   | Choice                                                                                                                    | Reason                                                                                         |
-| ---------------------- | ------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| Web client             | React + TypeScript + Vite                                                                                                 | Browser-first application with a small build system and responsive layouts.                    |
-| Client state/data      | TanStack Query; local component state; Zod validation                                                                     | Clear server-state ownership without a global-state framework.                                 |
-| API                    | Node.js LTS + TypeScript + Fastify                                                                                        | Small, typed, testable HTTP service with low framework overhead.                               |
-| Database               | PostgreSQL hosted in Supabase for staging/demo                                                                            | Durable relational constraints and a managed course deployment. Supabase Auth is not required. |
-| Database access        | Drizzle ORM and SQL migrations                                                                                            | Typed access while keeping schema and generated SQL reviewable.                                |
-| Job processing         | `pg-boss` backed by PostgreSQL                                                                                            | Retryable sync/extraction work without operating Redis.                                        |
-| AI extraction          | OpenAI Responses API structured output behind an `Extractor` interface                                                    | Schema-constrained output and a replaceable provider boundary.                                 |
-| Google integration     | Gmail API and Google Calendar API via backend-owned OAuth flow                                                            | Tokens remain off the device and integration behavior is centralized.                          |
-| Canvas calendar feed   | Maintained iCalendar parser behind pinned Sofia HTTPS, encrypted per-user subscription and bounded snapshots              | Native calendar dates without AI; explicit calendar-only consent, no provider writes.          |
-| Reminders              | Durable reminder metadata; delivery decision pending                                                                      | No claim of reliable closed-browser delivery and no unapproved push/email infrastructure.      |
-| Unit/integration tests | Vitest, React Testing Library, PostgreSQL test database                                                                   | Fast deterministic tests around behavior and constraints.                                      |
-| End-to-end smoke       | Local Playwright/browser tooling on the designated browser                                                                | Exercises the actual web interaction path; no Google UI writes.                                |
-| Quality/security       | TypeScript strict mode, ESLint, Prettier, dependency audit, secret scan, CodeQL when a private/remote CI decision is made | Course-aligned quality gates; local equivalents run before a remote exists.                    |
+| Area                   | Choice                                                                                                                                       | Reason                                                                                                |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| Web client             | React + TypeScript + Vite                                                                                                                    | Browser-first application with a small build system and responsive layouts.                           |
+| Client state/data      | TanStack Query; local component state; Zod validation                                                                                        | Clear server-state ownership without a global-state framework.                                        |
+| API                    | Node.js LTS + TypeScript + Fastify                                                                                                           | Small, typed, testable HTTP service with low framework overhead.                                      |
+| Database               | PostgreSQL hosted in Supabase for staging/demo                                                                                               | Durable relational constraints and a managed course deployment. Supabase Auth is not required.        |
+| Database access        | Drizzle ORM and SQL migrations                                                                                                               | Typed access while keeping schema and generated SQL reviewable.                                       |
+| Job processing         | `pg-boss` backed by PostgreSQL                                                                                                               | Retryable sync/extraction work without operating Redis.                                               |
+| AI extraction          | OpenAI Responses API structured output behind an `Extractor` interface                                                                       | Schema-constrained output and a replaceable provider boundary.                                        |
+| Google integration     | Gmail API and Google Calendar API via backend-owned OAuth flow                                                                               | Tokens remain off the device and integration behavior is centralized.                                 |
+| Canvas calendar feed   | Maintained iCalendar parser behind pinned Sofia HTTPS, encrypted per-user subscription and bounded snapshots                                 | Native calendar dates without AI; explicit calendar-only consent, no provider writes.                 |
+| Reminders              | Durable reminder metadata; delivery decision pending                                                                                         | No claim of reliable closed-browser delivery and no unapproved push/email infrastructure.             |
+| Unit/integration tests | Vitest, React Testing Library, PostgreSQL test database                                                                                      | Fast deterministic tests around behavior and constraints.                                             |
+| End-to-end smoke       | Local Playwright/browser tooling on the designated browser                                                                                   | Exercises the actual web interaction path; no Google UI writes.                                       |
+| Quality/security       | TypeScript strict mode, ESLint, Prettier, full PostgreSQL tests, isolated web build in GitHub CI; separate dependency/secret/security review | `Quality gate` is the merge-policy check; additional security tools are not implied to be configured. |
 
 ### Runtime topology
 
@@ -342,12 +342,12 @@ The plan avoids pretending four people are full-time developers. Member 1 owns i
 | Member 3 — UI/UX and Evaluation Lead            | User flows, wireframes, accessibility review, anonymized evaluation messages, usability sessions                  | Design artifact, evaluated cases, observed usability issues        |
 | Member 4 — QA, Security, and Documentation Lead | Test plan, test cases, incident taxonomy, test execution evidence, threat model, final report coordination        | Test results, defect report, security review, documentation delta  |
 
-Required cross-review:
+Required course/evaluation cross-review (separate from GitHub merge approvals):
 
 - Member 2 reviews acceptance criteria against proposal and customer value.
 - Member 3 reviews each implemented workflow on the designated device.
 - Member 4 reviews tests and security evidence; Member 1 resolves technical findings.
-- At least one non-author reviews every course document and significant code change before it is considered complete.
+- At least one non-author reviews every course document before it is considered complete. Preserve independent code-review findings/resolutions needed for course evidence; code PRs themselves require zero approvals and may be self-reviewed/self-merged by their author.
 - All members participate in the proposal pitch, final presentation, and oral defense.
 
 ## 12. Engineering workflow
@@ -355,13 +355,19 @@ Required cross-review:
 The owner approved private GitHub publication on 2026-10-08. The repository is [kim-913/mscs2101](https://github.com/kim-913/mscs2101); the earlier local-only/no-remote restriction is superseded. See [CONTRIBUTING.md](CONTRIBUTING.md) for current setup and review procedures, [AGENTS.md](AGENTS.md) for the agent entry point, and the linked role Skills for role-specific execution.
 
 1. Keep the authoritative source and sanitized technical documentation in the private repository.
-2. Use short-lived branches and reviewed pull requests; stage only owned files and preserve shared history. Branch protection and CI are not claimed to be configured.
+2. Use short-lived `feature/*`, `fix/*`, `docs/*`, or `chore/*` branches and one coherent PR to `main`; stage only owned files. Coordinate overlapping work and one integration owner. Never directly push or force-push `main`, or rewrite shared branches; synchronize with `git fetch origin` and `git merge origin/main`, resolving conflicts with affected owners.
 3. Documents maintained in the dedicated Drive project folder need dated/versioned exports and links in the task or traceability record; do not let competing copies silently become authoritative.
 4. Maintain one active milestone and a small reviewed task list; no untracked side features.
 5. For each behavior: requirement -> design/ADR if needed -> implementation -> focused test -> actual browser/API smoke -> documentation update.
 6. Record AI-assisted work in weekly standups: task, tool, human review performed, test evidence, and corrections made.
 7. Never place `.env`, OAuth credentials, refresh tokens, private feed URLs, raw private content, local session handoffs, or non-anonymized test data in shared documents or Git.
-8. Keep role ownership distinct from GitHub permissions. At least one non-author reviews significant code changes and course documents. Source publication is not deployment or permission to submit to Canvas.
+8. Keep role ownership distinct from GitHub permissions. Code PRs require zero approvals: authors may self-review and squash-merge after resolving conversations, integrating current `main` without conflicts, and observing `CI` / `Quality gate` success on the latest PR commit and current integration. If either branch changes, synchronize as needed and obtain a fresh successful run. Delete merged branches. Independent non-author course-document review is still required; source publication is not deployment or permission to submit to Canvas.
+
+The canonical commands and PR steps are in [CONTRIBUTING.md section 4](CONTRIBUTING.md#4-implement-review-and-prove-a-change). [`.github/workflows/ci.yml`](.github/workflows/ci.yml) defines workflow `CI`, stable job/check `Quality gate`, on pull requests, pushes to `main`, and manual dispatch. On Node.js 22/npm 11 it runs `npm ci`, `npm run typecheck`, `npm run lint`, `npm run format:check`, full `npm test` with disposable PostgreSQL 16 `TEST_DATABASE_URL` and no database-suite skips, then an isolated web production build. It needs no real secrets/providers and performs no deployment.
+
+**Current enforcement limitation (2026-10-08):** the private repository's GitHub protection API returned HTTP 403: `Upgrade to GitHub Pro or make this repository public to enable this feature.` Keep the repository private. These are mandatory team policies, not server-enforced protection; CI cannot prevent direct pushes or policy-violating self-merges. If the plan later supports private-repository protection, require PRs, current-main integration, resolved conversations, and `Quality gate`, with **zero required approvals**. GitHub cannot accept an author's approval of their own PR; self-review is not an approval event.
+
+Configured GitHub settings allow squash merges only, disable merge-commit/rebase merging, delete merged branches automatically, and enable branch updates and Actions. Both protection and ruleset APIs are unavailable under the current plan; no paid upgrade or public publication is authorized.
 
 ### Change control
 
@@ -455,7 +461,7 @@ An ADR records context, decision, alternatives rejected, consequences, and verif
 3. Create EARS requirements and a requirement-to-acceptance traceability matrix.
 4. Create responsive web flows for onboarding, inbox, suggestion review, dashboard, and task detail.
 5. Register the Google Cloud project in testing mode and prove OAuth, Gmail list/get, Calendar list, token refresh, and revocation with one test account.
-6. Initialize the local TypeScript workspace and local Git only after explicit approval; no remote.
+6. Maintain the initialized TypeScript workspace in the authorized private GitHub repository using the branch/PR workflow in section 12; the former local-only/no-remote restriction is superseded.
 7. Implement one thin vertical slice before broad feature work: browser button -> API -> database -> visible result.
 8. Continue milestone by milestone using the release gates in this plan.
 

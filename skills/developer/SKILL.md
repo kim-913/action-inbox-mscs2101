@@ -44,6 +44,12 @@ Resolve implementation facts from code and existing decisions first. Ask the own
 - Expose disabled extraction, partial pagination, missing dates, and retryable errors honestly; retain last-success data. Reminder metadata is not notification delivery. Canvas subscription data is not full Canvas OAuth, grades, submissions, or authoritative completion state.
 - Do not redefine P0 acceptance, approve design/product scope on behalf of another role, or claim QA/release completion from implementation alone. Coordinate UX choices with UI Designer, requirement changes with PM, and evidence gaps with QA.
 
+### PR policy and separate review obligations
+
+Follow [CONTRIBUTING.md](../../CONTRIBUTING.md) for the canonical branch, synchronization, CI, and merge procedure. PRs require **zero approvals**: the author may self-review and squash-merge after `Quality gate` succeeds on the latest commit, current `main` is integrated, the diff is conflict-free, and conversations are resolved. GitHub does not permit self-approval; self-review is not an approval event. Technical peer review is optional, not a merge gate. Required verification and any separately recorded non-author course-artifact review remain obligations; merging does not satisfy them.
+
+These are mandatory team rules, not server-enforced branch protection. Protection access for this private repository returns HTTP 403 under the current plan; CI cannot prevent direct pushes or premature merges. Keep the repository private and follow the contributor guide rather than claiming enforcement.
+
 ## Workflow
 
 1. **Bound the change.** Map requirements to affected modules and consumer-visible behavior. Agree cross-role interfaces before concurrent edits; one owner integrates shared files.
@@ -52,7 +58,7 @@ Resolve implementation facts from code and existing decisions first. Ask the own
 4. **Handle storage deliberately.** Never edit or replace an applied migration, reset live storage, or bypass checksum failures. Add a new ordered migration when needed and update schema/code/tests consistently. The migration runner uses a transaction, checksums, and an advisory lock; API startup can also apply migrations. A startup is therefore not a harmless database probe. Arrange migration verification only against a disposable database.
 5. **Prepare behavioral proof.** Add focused regressions alongside existing tests, covering the consumer-visible failure and corrected behavior, not merely internal implementation details. Include affected failure, authorization, concurrency/retry, and date cases rather than unrelated coverage expansion.
 6. **Coordinate verification.** Follow the assignment's execution authority. When a central owner runs checks, hand over exact commands/cases without running duplicate suites, builds, linters, or formatters. Existing check entry points include `npm run typecheck`, `npm test`, `npm run lint`, and `npm run format:check`; build/smoke setup belongs in [CONTRIBUTING.md](../../CONTRIBUTING.md). Database results require an isolated `TEST_DATABASE_URL`; missing it means skipped database coverage.
-7. **Update the truth.** Update affected API/requirements/evidence documentation and the handoff record. Label checks as executed, not run, skipped, or blocked; distinguish synthetic, user-reported, and independently observed evidence. Request a non-author review before treating a significant change as complete.
+7. **Update the truth.** Update affected API/requirements/evidence documentation and the handoff record. Label checks as executed, not run, skipped, or blocked; distinguish synthetic, user-reported, and independently observed evidence. Offer optional technical peer review where useful; obtain non-author course-artifact review when that separate deliverable requires it.
 
 ## Safety boundaries
 
@@ -74,11 +80,15 @@ Checks actually executed (command, environment class, result, evidence path):
 Not run / skipped / blocked checks and reason:
 Documentation updated:
 Known limitations / unresolved acceptance:
-Review owner and next authorized action:
+PR / branch / latest commit / current main integration:
+Author self-review / Quality gate result / conflicts / resolved conversations:
+Optional technical peer review (performed, pending, or not requested):
+Required course-artifact non-author review (status or not applicable):
+Verification owner and next authorized action:
 ```
 
 Never paste connection strings, raw private data, or credentials into this template. Reference the repository's handoff convention in CONTRIBUTING rather than creating a competing handoff format or location.
 
 ## Done criteria
 
-The scoped behavior is implemented end to end; affected consumers, tests, and documentation agree; no obsolete path or fake fallback remains; live services/data are unchanged unless separately authorized. The receiving reviewer can reproduce the intended proof from the handoff, with all unexecuted checks and acceptance gaps explicit. A completed implementation handoff is not a passed release gate: independent review and the required observed verification still determine acceptance.
+The scoped behavior is implemented end to end; affected consumers, tests, and documentation agree; no obsolete path or fake fallback remains; live services/data are unchanged unless separately authorized. The receiving owner can reproduce the intended proof from the handoff, with all unexecuted checks and acceptance gaps explicit. A completed implementation handoff or self-merged PR is not a passed release gate: required observed verification and applicable course-artifact non-author review still determine acceptance. Optional technical peer review is not a required PR approval.
