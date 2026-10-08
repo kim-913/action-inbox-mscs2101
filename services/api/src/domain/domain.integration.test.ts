@@ -17,6 +17,8 @@ import {
   taskSchema,
   tasksResponseSchema,
   upcomingCalendarResponseSchema,
+  displayPreferencesSchema,
+  displayRoutes,
 } from "@action-inbox/contracts";
 import { registerAuth } from "../auth/index.js";
 import { connectionIdentity } from "../auth/google.js";
@@ -58,6 +60,11 @@ describe.skipIf(!connectionString)(
     let insertionCount: number;
     let listTimezone: string | null;
     let authorizationSeen: boolean;
+    let listBounds: {
+      min: string | null;
+      max: string | null;
+      limit: string | null;
+    };
     let failEventRead: boolean;
 
     beforeAll(async () => {
@@ -79,6 +86,11 @@ describe.skipIf(!connectionString)(
         const collection = "/calendar/v3/calendars/primary/events";
         if (url.pathname === collection && request.method === "GET") {
           listTimezone = url.searchParams.get("timeZone");
+          listBounds = {
+            min: url.searchParams.get("timeMin"),
+            max: url.searchParams.get("timeMax"),
+            limit: url.searchParams.get("maxResults"),
+          };
           response.writeHead(listStatus).end(
             JSON.stringify(
               listStatus === 200
@@ -213,6 +225,7 @@ describe.skipIf(!connectionString)(
       listTimezone = null;
       authorizationSeen = false;
       failEventRead = false;
+      listBounds = { min: null, max: null, limit: null };
       owner = await createUser();
       outsider = await createUser();
       emailId = randomUUID();
@@ -273,6 +286,311 @@ describe.skipIf(!connectionString)(
       expect(response.statusCode).toBe(201);
       return taskSchema.parse(response.json());
     }
+
+    it("persists isolated display preferences across sessions and rejects unauthenticated or unsafe writes", async () => {
+      expect((await app.inject(displayRoutes.preferences)).statusCode).toBe(
+        401,
+      );
+      expect(
+        (
+          await app.inject({
+            method: "PUT",
+            url: displayRoutes.preferences,
+            headers: { origin: config.webOrigin },
+            payload: { windowDays: 7 },
+          })
+        ).statusCode,
+      ).toBe(401);
+      const initial = await app.inject({
+        url: displayRoutes.preferences,
+        headers: owner.headers,
+      });
+      expect(initial.headers["cache-control"]).toBe("no-store");
+      expect(displayPreferencesSchema.parse(initial.json())).toEqual({
+        windowDays: 30,
+      });
+      for (const headers of [
+        { cookie: owner.headers.cookie!, origin: config.webOrigin },
+        { ...owner.headers, origin: "https://untrusted.example" },
+        { ...owner.headers, "x-csrf-token": "wrong" },
+      ]) {
+        const response = await app.inject({
+          method: "PUT",
+          url: displayRoutes.preferences,
+          headers,
+          payload: { windowDays: 7 },
+        });
+        expect(response.statusCode).toBe(403);
+        expect(response.json().code).toBe("CSRF_INVALID");
+      }
+      for (const windowDays of [0, -1, 366, 7.5, "7", null]) {
+        expect(
+          (
+            await app.inject({
+              method: "PUT",
+              url: displayRoutes.preferences,
+              headers: owner.headers,
+              payload: { windowDays },
+            })
+          ).statusCode,
+        ).toBe(400);
+      }
+      expect(
+        (
+          await app.inject({
+            method: "PUT",
+            url: displayRoutes.preferences,
+            headers: owner.headers,
+            payload: { windowDays: 7, userId: outsider.id },
+          })
+        ).statusCode,
+      ).toBe(400);
+      const saved = await app.inject({
+        method: "PUT",
+        url: displayRoutes.preferences,
+        headers: owner.headers,
+        payload: { windowDays: 7 },
+      });
+      expect(saved.statusCode).toBe(200);
+      expect(displayPreferencesSchema.parse(saved.json())).toEqual({
+        windowDays: 7,
+      });
+      const issued = await issueSession(pool, owner.id);
+      const reloaded = await app.inject({
+        url: displayRoutes.preferences,
+        headers: { cookie: `ai_session=${issued.credential}` },
+      });
+      expect(reloaded.json()).toEqual({ windowDays: 7 });
+      expect(
+        (
+          await app.inject({
+            url: displayRoutes.preferences,
+            headers: outsider.headers,
+          })
+        ).json(),
+      ).toEqual({ windowDays: 30 });
+      expect(
+        (
+          await pool.query(
+            "SELECT display_window_days FROM users WHERE id=$1",
+            [owner.id],
+          )
+        ).rows[0],
+      ).toMatchObject({ display_window_days: 7 });
+    });
+
+    it("filters task dates and persisted provenance before pagination with separately opt-in undated tasks", async () => {
+      const range = {
+        startAt: "2026-12-04T00:00:00-05:00",
+        endAt: "2026-12-06T00:00:00-05:00",
+        startDate: "2026-12-04",
+        endDate: "2026-12-06",
+      };
+      const ids: string[] = [];
+      for (const date of [
+        range.startAt,
+        "2026-12-05T18:00:00Z",
+        range.endAt,
+        "2026-12-04T04:59:59Z",
+        null,
+      ]) {
+        const response = await app.inject({
+          method: "POST",
+          url: "/v1/tasks",
+          headers: owner.headers,
+          payload: {
+            requestId: randomUUID(),
+            title: "Same task title",
+            dueAt: date,
+          },
+        });
+        expect(response.statusCode).toBe(201);
+        ids.push(taskSchema.parse(response.json()).id);
+      }
+      const approved = taskSchema.parse(
+        (
+          await app.inject({
+            method: "POST",
+            url: `/v1/suggestions/${suggestionId}/approve`,
+            headers: owner.headers,
+            payload: { version: 0, title: "Same task title" },
+          })
+        ).json(),
+      );
+      await pool.query(
+        "UPDATE email_messages SET received_at='2020-01-01' WHERE id=$1",
+        [emailId],
+      );
+      const query = new URLSearchParams({
+        ...range,
+        source: "manual",
+        limit: "1",
+      });
+      const first = tasksResponseSchema.parse(
+        (
+          await app.inject({
+            url: `/v1/tasks?${query}`,
+            headers: owner.headers,
+          })
+        ).json(),
+      );
+      expect(first.items).toHaveLength(1);
+      expect([ids[0], ids[1]]).toContain(first.items[0]!.id);
+      expect(first.nextCursor).not.toBeNull();
+      query.set("cursor", first.nextCursor!);
+      const second = tasksResponseSchema.parse(
+        (
+          await app.inject({
+            url: `/v1/tasks?${query}`,
+            headers: owner.headers,
+          })
+        ).json(),
+      );
+      expect(
+        new Set([...first.items, ...second.items].map((task) => task.id)),
+      ).toEqual(new Set(ids.slice(0, 2)));
+      expect(second.nextCursor).toBeNull();
+      query.set("source", "gmail");
+      expect(
+        (
+          await app.inject({
+            url: `/v1/tasks?${query}`,
+            headers: owner.headers,
+          })
+        ).statusCode,
+      ).toBe(400);
+      query.delete("cursor");
+      const gmail = tasksResponseSchema.parse(
+        (
+          await app.inject({
+            url: `/v1/tasks?${query}`,
+            headers: owner.headers,
+          })
+        ).json(),
+      );
+      expect(gmail.items.map((task) => task.id)).toEqual([approved.id]);
+      expect(gmail.items[0]!.sourceEmailId).toBe(emailId);
+      query.set("source", "manual");
+      query.set("includeUndated", "true");
+      query.set("limit", "100");
+      const including = tasksResponseSchema.parse(
+        (
+          await app.inject({
+            url: `/v1/tasks?${query}`,
+            headers: owner.headers,
+          })
+        ).json(),
+      );
+      expect(new Set(including.items.map((task) => task.id))).toEqual(
+        new Set([ids[0], ids[1], ids[4]]),
+      );
+      expect(
+        including.items.find((task) => task.id === ids[4])?.dueAt,
+      ).toBeNull();
+      // A list filter must not make an owned task's detail inaccessible.
+      const detail = await app.inject({
+        url: `/v1/tasks/${ids[2]}`,
+        headers: owner.headers,
+      });
+      expect(detail.statusCode).toBe(200);
+      expect(taskSchema.parse(detail.json())).toMatchObject({
+        id: ids[2],
+        dueAt: new Date(range.endAt).toISOString(),
+      });
+      expect(
+        (
+          await app.inject({
+            url: `/v1/tasks/${ids[2]}`,
+            headers: outsider.headers,
+          })
+        ).statusCode,
+      ).toBe(404);
+      expect(
+        (await app.inject({ url: `/v1/tasks/${ids[2]}` })).statusCode,
+      ).toBe(401);
+      expect(
+        tasksResponseSchema.parse(
+          (
+            await app.inject({ url: "/v1/tasks", headers: owner.headers })
+          ).json(),
+        ).items,
+      ).toHaveLength(6);
+    });
+
+    it("bounds Calendar transport and re-filters the preserved snapshot during outages", async () => {
+      const range = {
+        startAt: "2026-12-05T00:00:00-05:00",
+        endAt: "2026-12-06T00:00:00-05:00",
+        startDate: "2026-12-05",
+        endDate: "2026-12-06",
+      };
+      const first = upcomingCalendarResponseSchema.parse(
+        (
+          await app.inject({
+            url: `/v1/calendar/upcoming?${new URLSearchParams(range)}`,
+            headers: owner.headers,
+          })
+        ).json(),
+      );
+      expect(first.items.map((item) => item.id)).toEqual(["all-day", "timed"]);
+      expect(listBounds).toEqual({
+        min: range.startAt,
+        max: range.endAt,
+        limit: "100",
+      });
+      listStatus = 503;
+      const later = {
+        startAt: range.endAt,
+        endAt: "2026-12-07T00:00:00-05:00",
+        startDate: range.endDate,
+        endDate: "2026-12-07",
+      };
+      const failed = upcomingCalendarResponseSchema.parse(
+        (
+          await app.inject({
+            url: `/v1/calendar/upcoming?${new URLSearchParams(later)}`,
+            headers: owner.headers,
+          })
+        ).json(),
+      );
+      expect(failed.items).toEqual([]);
+      expect(failed.error?.code).toBe("GOOGLE_UNAVAILABLE");
+      expect(failed.lastSuccessfulFetchAt).toBe(first.lastSuccessfulFetchAt);
+      const retained = upcomingCalendarResponseSchema.parse(
+        (
+          await app.inject({
+            url: `/v1/calendar/upcoming?${new URLSearchParams(range)}`,
+            headers: owner.headers,
+          })
+        ).json(),
+      );
+      expect(retained.items).toEqual(first.items);
+      // Native date overlap wins even when a UTC conversion would put the date elsewhere.
+      const native = {
+        startAt: "2026-12-04T00:00:00+14:00",
+        endAt: "2026-12-05T00:00:00+14:00",
+        startDate: "2026-12-04",
+        endDate: "2026-12-05",
+      };
+      expect(
+        upcomingCalendarResponseSchema.parse(
+          (
+            await app.inject({
+              url: `/v1/calendar/upcoming?${new URLSearchParams(native)}`,
+              headers: owner.headers,
+            })
+          ).json(),
+        ).items,
+      ).toEqual([]);
+      expect(
+        (
+          await app.inject({
+            url: "/v1/calendar/upcoming?startAt=2026-12-04T00:00:00Z",
+            headers: owner.headers,
+          })
+        ).statusCode,
+      ).toBe(400);
+    });
 
     it("creates no task until approval and locks concurrent approval into one complete task", async () => {
       expect(

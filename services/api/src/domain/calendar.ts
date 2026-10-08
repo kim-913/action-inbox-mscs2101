@@ -3,6 +3,7 @@ import type pg from "pg";
 import {
   apiRoutes,
   calendarEventCreateRequestSchema,
+  upcomingCalendarQuerySchema,
   type ApiError,
   type CalendarEvent,
 } from "@action-inbox/contracts";
@@ -27,6 +28,7 @@ import {
   safeGoogleFailure,
   validTimezone,
 } from "./calendar-provider.js";
+import { calendarInRange } from "./display-window.js";
 
 interface SnapshotRow extends pg.QueryResultRow {
   items: CalendarEvent[];
@@ -40,13 +42,18 @@ export function registerCalendar(app: FastifyInstance, runtime: Runtime): void {
     { preHandler: runtime.requireUser },
     async (request) => {
       const userId = authenticatedUser(request);
+      const query = parse(upcomingCalendarQuerySchema, request.query);
       const users = await runtime.pool.query<{ timezone: string }>(
         "SELECT timezone FROM users WHERE id=$1",
         [userId],
       );
       const timezone = users.rows[0]?.timezone ?? "UTC";
       const url = new URL(eventsUrl(runtime));
-      url.searchParams.set("timeMin", new Date().toISOString());
+      url.searchParams.set(
+        "timeMin",
+        query.startAt ?? new Date().toISOString(),
+      );
+      if (query.endAt) url.searchParams.set("timeMax", query.endAt);
       url.searchParams.set("singleEvents", "true");
       url.searchParams.set("orderBy", "startTime");
       url.searchParams.set("maxResults", "100");
@@ -85,7 +92,9 @@ export function registerCalendar(app: FastifyInstance, runtime: Runtime): void {
         );
         const snapshot = snapshots.rows[0];
         return {
-          items: snapshot?.items ?? [],
+          items: (snapshot?.items ?? []).filter((item) =>
+            calendarInRange(item, query),
+          ),
           lastSuccessfulFetchAt:
             snapshot?.last_successful_fetch_at?.toISOString() ?? null,
           error: error ?? snapshot?.error ?? null,

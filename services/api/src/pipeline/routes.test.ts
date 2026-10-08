@@ -161,6 +161,164 @@ describe.skipIf(!connectionString)(
       );
       expect(filtered.items.map((email) => email.id)).toEqual([firstEmail]);
     });
+    it("filters received instants before pagination and keeps extraction-disabled mail readable", async () => {
+      const range = {
+        startAt: "2026-10-08T00:00:00-07:00",
+        endAt: "2026-10-09T00:00:00-07:00",
+        startDate: "2026-10-08",
+        endDate: "2026-10-09",
+      };
+      const inside = randomUUID();
+      const outside = randomUUID();
+      try {
+        for (const [id, received] of [
+          [inside, range.startAt],
+          [outside, range.endAt],
+        ]) {
+          await pool.query(
+            `INSERT INTO email_messages(id,user_id,gmail_message_id,gmail_thread_id,sender,subject,received_at,normalized_body,body_hash,extraction_status)
+             VALUES($1::uuid,$2,$1::text,$1::text,'sender@example.invalid','Readable mail',$3,'Readable without AI','hash','Failed')`,
+            [id, userId, received],
+          );
+        }
+        const response = await app.inject({
+          url: `/v1/inbox?${new URLSearchParams({ ...range, limit: "1" })}`,
+          headers: { "x-test-user": userId },
+        });
+        expect(response.statusCode).toBe(200);
+        const filtered = inboxResponseSchema.parse(response.json());
+        expect(filtered.items.map((email) => email.id)).toEqual([inside]);
+        expect(filtered.items[0]!.suggestions).toEqual([]);
+        expect(filtered.items[0]!.extractionStatus).toBe("Failed");
+        expect(filtered.nextCursor).toBeNull();
+        expect(
+          (
+            await app.inject({
+              url: "/v1/inbox?startDate=2026-10-07",
+              headers: { "x-test-user": userId },
+            })
+          ).statusCode,
+        ).toBe(400);
+        const unfiltered = inboxResponseSchema.parse(
+          (
+            await app.inject({
+              url: "/v1/inbox?limit=1",
+              headers: { "x-test-user": userId },
+            })
+          ).json(),
+        );
+        expect(
+          (
+            await app.inject({
+              url: `/v1/inbox?${new URLSearchParams({ ...range, cursor: unfiltered.nextCursor! })}`,
+              headers: { "x-test-user": userId },
+            })
+          ).statusCode,
+        ).toBe(400);
+      } finally {
+        await pool.query(
+          "DELETE FROM email_messages WHERE id=ANY($1::uuid[])",
+          [[inside, outside]],
+        );
+      }
+    });
+
+    it("includes old mail only when the same suggestion matches review state and due range, with undated opt-in", async () => {
+      const old = randomUUID();
+      const mismatched = randomUUID();
+      const undated = randomUUID();
+      const ids = [old, mismatched, undated];
+      try {
+        for (const id of ids) {
+          await pool.query(
+            `INSERT INTO email_messages(id,user_id,gmail_message_id,gmail_thread_id,sender,subject,received_at,normalized_body,body_hash,extraction_status)
+             VALUES($1::uuid,$2,$1::text,$1::text,'sender@example.invalid','Old mail','2020-01-01','Review this action','hash','Failed')`,
+            [id, userId],
+          );
+        }
+        for (const [email, due, state] of [
+          [old, "2026-12-04T17:00:00Z", "Proposed"],
+          [mismatched, "2026-12-04T17:00:00Z", "Rejected"],
+          [mismatched, "2026-12-06T00:00:00Z", "Proposed"],
+          [undated, null, "Proposed"],
+        ]) {
+          const id = randomUUID();
+          await pool.query(
+            `INSERT INTO suggestions(id,user_id,email_id,category,title,due_at,deadline_certainty,confidence,evidence,needs_review,review_state,fingerprint,action_key)
+             VALUES($1::uuid,$2,$3,'Action Required','Review action',$4,'None',0.8,$5,true,$6,$1::text,$1::text)`,
+            [
+              id,
+              userId,
+              email,
+              due,
+              JSON.stringify({ quote: "Review", start: 0, end: 6 }),
+              state,
+            ],
+          );
+        }
+        const query = new URLSearchParams({
+          startAt: "2026-12-04T00:00:00Z",
+          endAt: "2026-12-06T00:00:00Z",
+          startDate: "2026-12-04",
+          endDate: "2026-12-06",
+          dateField: "suggestionDue",
+          reviewState: "Proposed",
+          limit: "1",
+        });
+        const first = inboxResponseSchema.parse(
+          (
+            await app.inject({
+              url: `/v1/inbox?${query}`,
+              headers: { "x-test-user": userId },
+            })
+          ).json(),
+        );
+        expect(first.items.map((email) => email.id)).toEqual([old]);
+        expect(first.nextCursor).toBeNull();
+        query.set("includeUndated", "true");
+        const found: string[] = [];
+        do {
+          const page = inboxResponseSchema.parse(
+            (
+              await app.inject({
+                url: `/v1/inbox?${query}`,
+                headers: { "x-test-user": userId },
+              })
+            ).json(),
+          );
+          found.push(...page.items.map((email) => email.id));
+          if (page.nextCursor) query.set("cursor", page.nextCursor);
+          else query.delete("cursor");
+        } while (query.has("cursor"));
+        expect(found.sort()).toEqual([old, undated].sort());
+        query.delete("cursor");
+        query.set("dateField", "received");
+        expect(
+          inboxResponseSchema.parse(
+            (
+              await app.inject({
+                url: `/v1/inbox?${query}`,
+                headers: { "x-test-user": userId },
+              })
+            ).json(),
+          ).items,
+        ).toEqual([]);
+        expect(
+          (
+            await app.inject({
+              url: `/v1/emails/${old}`,
+              headers: { "x-test-user": userId },
+            })
+          ).statusCode,
+        ).toBe(200);
+      } finally {
+        await pool.query(
+          "DELETE FROM email_messages WHERE id=ANY($1::uuid[])",
+          [ids],
+        );
+      }
+    });
+
     it("atomically persists a real queue job and keeps run ownership isolated", async () => {
       const response = await app.inject({
         method: "POST",

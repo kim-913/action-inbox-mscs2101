@@ -119,3 +119,33 @@ At the redesign milestone, Outlook/Canvas, additional calendar views, flight spe
 ## Canvas calendar-only increment
 
 The separately approved Canvas subscription's implementation, centralized **304-test** gate, synthetic HTTP/browser evidence, and real-access limitations are recorded in [Canvas subscription evidence](canvas-subscription-evidence.md). This does not convert the original four-user Google, paid-model accuracy, or reminder-delivery blockers into completed acceptance criteria.
+
+## Shared display window and source separation
+
+Implemented on `feature/display-window-and-sources`, based on main `5dd9c75983c05b54f7e349e1fe05b53310d3134f`, on 2026-10-08. This is synthetic local evidence, not a new real-account acceptance run or deployment. All services used disposable ports 3002 / 5174 / 55433, PostgreSQL 16, and a dedicated Chrome profile. The live preview, private content, encryption keys and disabled paid-model setting were untouched.
+
+The fixture import supplied six readable messages with extraction disabled. A throwaway seed changed only disposable receipt dates and added synthetic manual tasks, one previously approved Gmail task and one proposal from an older email. These seeded records do not claim successful model extraction. Matching lists were exercised through the actual authenticated API with page size 2:
+
+| Display days | Matching received mail | Dated manual tasks | Separately undated manual tasks | Original Canvas fixture items |
+| ------------ | ---------------------- | ------------------ | ------------------------------- | ----------------------------- |
+| 7            | 3                      | 2                  | 1                               | 0                             |
+| 30           | 5                      | 4                  | 1                               | 4                             |
+| 10           | 4                      | 3                  | 1                               | 3                             |
+| 1            | 1                      | 1                  | 1                               | 0                             |
+
+Receipt ages were 0, 1, 6, 7, 29 and 30 local calendar days. Manual due offsets were −1, 0, 6, 7, 29, 30 and null. The old email's upcoming proposal was returned independently by the `suggestionDue` query; source provenance did not depend on loading that email in the recent-mail list. Filtering did not delete any rows or initiate extra provider imports.
+
+Observed browser behavior, including the isolated production build:
+
+- Saved 7-day and custom 10-day settings survived reload; the account preference survived logout/new synthetic login while Planner source selection returned to All.
+- Gmail showed readable messages with extraction disabled; Canvas, Google Calendar and manual-task views excluded other sources' entries. Inbox and Tasks used the same saved day count.
+- Custom 10 days included the native date-only Canvas reading day but excluded the following day's assignment; 30 days included both. A one-day Calendar view included the cross-timezone event occurring locally today and excluded tomorrow's all-day event.
+- Invalid custom zero remained unapplied. A browser-injected HTTP 503 for preference saving displayed the error and preserved the prior 30-day window; retry saved 7 successfully. This is fault injection, not an observed provider outage.
+- Moving an owned task's deadline beyond the window left its selected detail and actions accessible but removed it from dated-list counts. Smoke inspection first exposed a missing detail route (404); the implemented owner-scoped `GET /v1/tasks/:id` returned 200 afterward. The database regression also verifies foreign-user 404 and anonymous 401.
+- A separately seeded native-date Canvas event spanning yesterday/today appeared in today's grid and agenda, with no entry on its exclusive end day tomorrow. Its source start date was not rewritten.
+- Desktop and 390px mobile layouts were visually inspected. At 390px the document width was exactly 390px; source controls wrapped without horizontal overflow.
+- Confirmed logout removed private content and the preference control. Browser automation had inconsistent click/date-fill behavior; native input events and programmatic DOM activation were used where needed, without bypassing application validation or replacing API responses except the explicit save-failure injection above.
+
+Centralized regression coverage includes preference ownership/CSRF, source/date filtering before pagination, filter-bound cursors, DST/local-day boundaries and rollover, native event overlap, calendar last-success filtering, and task-detail retention. Local results were 92 web, 233 API/provider/database, and 18 contract tests (343 total), with no database skips. Typechecking, linting and the isolated production build passed; upstream TanStack/Zod bundler warnings remained non-fatal. The PR's required CI check records the final integrated revision.
+
+Migration `0007_display_preferences.sql` was applied only to disposable databases. No real Google/Canvas operation, paid extraction, external Calendar write, notification send, or stable-preview cutover was performed. Gmail's existing 14-day/100-message ingestion cap, Canvas feed coverage and Calendar's 100-event bound remain distinct from the display setting.

@@ -1,10 +1,10 @@
 # Browser P0 API contract
 
-The Zod schemas in `packages/contracts/src/p0.ts` are authoritative and are consumed by the browser and implemented server routes. Provider operations use real adapters; no UI should claim availability until its endpoint succeeds. Local sanitized-provider evidence does not establish live Google or paid-model acceptance.
+The Zod schemas in `packages/contracts/src/p0.ts`, `canvas.ts`, and `display.ts` are authoritative and are consumed by the browser and implemented server routes. Provider operations use real adapters; no UI should claim availability until its endpoint succeeds. Local sanitized-provider evidence does not establish live Google or paid-model acceptance.
 
 ## Browser transport
 
-Use `credentials: "include"` for every request. Call `GET /v1/auth/session` before login or other mutations. It returns `sessionResponseSchema`, including anonymous state and a CSRF token, and establishes an HttpOnly cookie. Send `X-CSRF-Token` on every POST/PATCH/DELETE, including Google start; the browser supplies the exact configured Origin. Session rotation updates the CSRF token. Never store bearer tokens in localStorage or read cookies in JavaScript. Errors use `apiErrorSchema`; show its safe message and request ID. Preserve previously successful data on refresh errors. Callback navigation uses a server-owned fixed web origin, never a client redirect URI.
+Use `credentials: "include"` for every request. Call `GET /v1/auth/session` before login or other mutations. It returns `sessionResponseSchema`, including anonymous state and a CSRF token, and establishes an HttpOnly cookie. Send `X-CSRF-Token` on every POST/PUT/PATCH/DELETE, including Google start; the browser supplies the exact configured Origin. Session rotation updates the CSRF token. Never store bearer tokens in localStorage or read cookies in JavaScript. Errors use `apiErrorSchema`; show its safe message and request ID. Preserve previously successful data on refresh errors. Callback navigation uses a server-owned fixed web origin, never a client redirect URI.
 
 OAuth callback outcome is `?auth=connected`, `?auth=denied`, or `?auth=failed`, never a provider message or credential.
 
@@ -18,6 +18,8 @@ OAuth callback outcome is `?auth=connected`, `?auth=denied`, or `?auth=failed`, 
 | GET `/v1/auth/google/callback`           | Google code/state or denial; browser-bound state validation | 303 fixed web origin with safe outcome, HttpOnly session on success                              |
 | POST `/v1/auth/refresh`                  | `emptyRequestSchema`                                        | 200 `sessionResponseSchema`; rotates current opaque session, no separate refresh credential      |
 | POST `/v1/auth/logout`                   | `emptyRequestSchema`                                        | 200 `successResponseSchema`                                                                      |
+| GET `/v1/preferences/display`            | none                                                        | 200 `displayPreferencesSchema`; authenticated user's saved window, default 30 days               |
+| PUT `/v1/preferences/display`            | `{ windowDays: integer }`, 1–365                            | 200 `displayPreferencesSchema`; persists only this user's display preference                     |
 | POST `/v1/connections/google/disconnect` | `emptyRequestSchema`                                        | 200 `successResponseSchema`; revoke and delete retained message-derived data                     |
 | DELETE `/v1/account/data`                | none                                                        | 200 `successResponseSchema`; revoke, cascade deletion and expire session                         |
 | POST `/v1/sync/gmail`                    | `emptyRequestSchema`                                        | 202 `syncRunSchema`; at most 100 messages in last 14 days                                        |
@@ -28,12 +30,13 @@ OAuth callback outcome is `?auth=connected`, `?auth=denied`, or `?auth=failed`, 
 | POST `/v1/suggestions/:id/approve`       | `suggestionApproveRequestSchema`                            | 200 `taskSchema`; atomic optional edit and approval; repeat returns same task                    |
 | POST `/v1/suggestions/:id/reject`        | `versionRequestSchema`                                      | 200 `suggestionSchema`                                                                           |
 | GET `/v1/tasks`                          | `tasksQuerySchema`                                          | 200 `tasksResponseSchema`                                                                        |
+| GET `/v1/tasks/:id`                      | none                                                        | 200 `taskSchema`; owned detail independent of display window, 404 for unavailable/foreign task   |
 | POST `/v1/tasks`                         | `taskCreateRequestSchema`                                   | 201 `taskSchema`; user explicitly creates manual task                                            |
 | PATCH `/v1/tasks/:id`                    | `taskEditRequestSchema`                                     | 200 `taskSchema`                                                                                 |
 | POST `/v1/tasks/:id/reminders`           | `reminderCreateRequestSchema`                               | 201 `reminderSchema`                                                                             |
 | PATCH `/v1/reminders/:id`                | `reminderEditRequestSchema`                                 | 200 `reminderSchema`                                                                             |
 | DELETE `/v1/reminders/:id`               | none                                                        | 200 `successResponseSchema`                                                                      |
-| GET `/v1/calendar/upcoming`              | none                                                        | 200 `upcomingCalendarResponseSchema`; cached successful data plus safe error on provider failure |
+| GET `/v1/calendar/upcoming`              | `upcomingCalendarQuerySchema`                               | 200 `upcomingCalendarResponseSchema`; cached successful data plus safe error on provider failure |
 | POST `/v1/tasks/:id/calendar-event`      | `calendarEventCreateRequestSchema`                          | 200 `calendarLinkSchema`; only explicitly approved tasks, deterministic event ID across retries  |
 
 `requestId` in create bodies is a client-generated UUID idempotency key, distinct from server error correlation IDs. Reuse the same requestId when retrying the same intent. Version fields enforce optimistic concurrency; stale writes return 409 `CONFLICT`. Ownership is always derived from server session, never supplied in bodies. Unsupported/uncertain due dates stay nullable and visibly flagged; edited dates are a user decision rather than invented source evidence. Read/review/reference emails can legitimately have no suggestions.
@@ -43,6 +46,26 @@ Calendar creation additionally uses a durable task-owned intent. After reload, a
 `POST /v1/sync/gmail` retries failed extractions for already persisted emails without overwriting approved/rejected decisions. Failed extraction sets the email's `extractionError` and prevents the containing run from reporting `Succeeded`; last successful data remains readable. Action and explicit-deadline support use separate `evidence` and `deadlineEvidence` fields.
 
 Reminder storage is not delivery: `delivery: "Not configured"` is mandatory. These endpoints manage only explicitly labelled in-app due metadata. The UI must not offer a control claiming a notification was scheduled, or report reminder success without a delivery mechanism. AC-09 remains incomplete and pending the user's delivery decision. No notification permission, email, push, or background delivery is implied.
+
+## Shared display window and source filtering
+
+`GET`/`PUT /v1/preferences/display` store an account-owned day count in `users.display_window_days` (migration `0007_display_preferences.sql`). The default is 30; the browser offers 7, 30, and custom 1–365 days. Saving does not start a Gmail import, refresh Canvas, delete older records, or change retention. The API preference is shared across sessions; source selection is transient browser state.
+
+List requests may supply **all four** ordered bounds: `startAt`, `endAt` (offset ISO timestamps), `startDate`, `endDate` (native `YYYY-MM-DD` dates). The interval is start-inclusive/end-exclusive. Partial or inverted bounds are rejected. The browser computes local-midnight boundaries using calendar-day arithmetic, not multiples of 24 hours; displayed dates and timezone describe the applied interval. Timed records use the instant bounds, while native date-only records use the date bounds without inventing a due time.
+
+| List                 | Date meaning and extra selectors                                                                                                                                              |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Inbox / recent Gmail | `dateField=received` (default): receipt falls within the last N local calendar days, including today.                                                                         |
+| Planner proposals    | `dateField=suggestionDue&reviewState=Proposed`: the same proposal must match both review state and upcoming due range. An older email can still contain an upcoming proposal. |
+| Tasks                | Upcoming `dueAt`; optional `source=gmail` or `source=manual`, determined from stored source ownership rather than whether the email happens to be loaded.                     |
+| Canvas items         | Assignment due/start point; calendar event interval overlapping the upcoming range. Native date-only values retain their original dates.                                      |
+| Google Calendar      | Events overlapping the upcoming range; provider requests include `timeMin`, `timeMax`, and the existing maximum of 100 results.                                               |
+
+Upcoming ranges include today and the next N−1 local calendar dates. For tasks/proposals, `includeUndated=true` additionally retrieves undated records for a separately labelled section; these are not represented as dated matches. With bounds omitted, existing unfiltered list behavior remains available to API callers. The saved preference does not silently rewrite a caller's explicit query.
+
+Inbox, task, and Canvas predicates run **before pagination**. Cursors bind the authenticated owner and selection predicates; changing the range/source requires starting at the first page. Canvas cursors additionally retain snapshot-revision fencing. A non-null cursor means only loaded matching pages are represented, not complete source coverage.
+
+Display filtering does not expand ingestion: Gmail import remains at most 100 messages from the latest 14 days, and Canvas remains the provider's bounded snapshot. Calendar failure responses filter the last successful snapshot to the requested range; that snapshot may have been fetched for another range and cannot establish complete current coverage. Direct authorized email/task details remain accessible independently of list selection.
 
 ## Internal planner composition and initial import
 
@@ -56,13 +79,13 @@ Calendar start/end are scheduled event times, not extracted task deadlines. Miss
 
 This is a separate read-only calendar-feed source, not Canvas OAuth or a full course/grade/submission integration. `packages/contracts/src/canvas.ts` is the shared contract. It uses the existing authenticated application session, exact Origin, and mutation CSRF protection. Google disconnect retains this independent subscription; account deletion removes it with the user.
 
-| Method and route               | Request                        | Response                                                                                                                                                         |
-| ------------------------------ | ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| GET `/v1/canvas/connection`    | none                           | `canvasConnectionSchema`; safe state, counts, last success, coverage and error, never the secret URL                                                             |
-| POST `/v1/canvas/connection`   | `{ feedUrl }`                  | Stores a new encrypted subscription and performs its first read; returns connection state, including a visible failed-import state if the feed could not be read |
-| POST `/v1/canvas/refresh`      | `{}`                           | Explicit bounded refresh using the stored secret; returns connection state                                                                                       |
-| GET `/v1/canvas/items`         | cursor and limit (maximum 100) | `canvasItemsResponseSchema`; source-specific items and next cursor                                                                                               |
-| DELETE `/v1/canvas/connection` | none                           | `{ ok: true }`; removes local subscription and imported snapshot only                                                                                            |
+| Method and route               | Request                                                         | Response                                                                                                                                                         |
+| ------------------------------ | --------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GET `/v1/canvas/connection`    | none                                                            | `canvasConnectionSchema`; safe state, counts, last success, coverage and error, never the secret URL                                                             |
+| POST `/v1/canvas/connection`   | `{ feedUrl }`                                                   | Stores a new encrypted subscription and performs its first read; returns connection state, including a visible failed-import state if the feed could not be read |
+| POST `/v1/canvas/refresh`      | `{}`                                                            | Explicit bounded refresh using the stored secret; returns connection state                                                                                       |
+| GET `/v1/canvas/items`         | cursor, limit (maximum 100), optional four-field display bounds | `canvasItemsResponseSchema`; source-specific matching items and next cursor                                                                                      |
+| DELETE `/v1/canvas/connection` | none                                                            | `{ ok: true }`; removes local subscription and imported snapshot only                                                                                            |
 
 Connecting over an existing subscription conflicts; the user must explicitly disconnect before replacing it. Initial connect plus manual Refresh are the only fetch triggers; there is no periodic/background-refresh claim. A failed refresh retains the last complete successful snapshot. Successful refresh replaces that snapshot by stable UID/occurrence identity, so changed dates update rather than duplicate. Snapshot disappearance is not proof of completion/cancellation: Canvas feeds have bounded date windows and provider limits. Cursors are snapshot-bound; a refresh between pages requires reloading.
 

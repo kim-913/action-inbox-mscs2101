@@ -19,6 +19,52 @@ const session = {
   googleConnected: false,
 };
 describe("browser API transport", () => {
+  it("fences private requests and creation drafts when the authenticated account changes", async () => {
+    const firstUser = {
+      id: "10000000-0000-4000-8000-000000000001",
+      email: "first@example.com",
+      displayName: "First",
+      timezone: "UTC",
+    };
+    const secondUser = {
+      ...firstUser,
+      id: "10000000-0000-4000-8000-000000000002",
+      email: "second@example.com",
+    };
+    let finish!: (response: Response) => void;
+    const fetcher = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(
+        Response.json({ ...session, authenticated: true, user: firstUser }),
+      )
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            finish = resolve;
+          }),
+      )
+      .mockResolvedValueOnce(
+        Response.json({ ...session, authenticated: true, user: secondUser }),
+      );
+    const api = new ApiClient("http://localhost:3000", fetcher);
+    await api.session();
+    api.pendingTask = {
+      requestId: firstUser.id,
+      title: "Private draft",
+      dueAt: null,
+    };
+    api.pendingReminders.set("old", {
+      requestId: firstUser.id,
+      scheduledAt: "2026-10-08T12:00:00Z",
+    });
+    const pending = api.request(apiRoutes.tasks, successResponseSchema);
+    await api.session();
+    finish(Response.json({ ok: true }));
+    await expect(pending).rejects.toThrow("interrupted");
+    expect(api.pendingTask).toBeNull();
+    expect(api.pendingReminders.size).toBe(0);
+  });
+
   it("binds the native fetch receiver to the browser global", async () => {
     const fetcher = vi.spyOn(globalThis, "fetch").mockImplementation(function (
       this: unknown,

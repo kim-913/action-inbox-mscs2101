@@ -33,6 +33,7 @@ export type EventIntent = {
 
 export class ApiClient {
   private csrf: string | null = null;
+  private userId: string | null = null;
   private generation = 0;
   private requests = new Set<AbortController>();
   pendingTask: TaskIntent | null = null;
@@ -48,6 +49,7 @@ export class ApiClient {
     this.generation += 1;
     this.csrf = null;
     this.pendingTask = null;
+    this.userId = null;
     this.pendingReminders.clear();
     this.pendingEvents.clear();
     for (const request of this.requests) request.abort();
@@ -66,6 +68,8 @@ export class ApiClient {
         "This session was replaced. Reload your session before making changes.",
         "UNAUTHENTICATED",
       );
+    if (this.userId !== (session.user?.id ?? null)) this.clear();
+    this.userId = session.user?.id ?? null;
     this.csrf = session.csrfToken;
     return session;
   }
@@ -74,7 +78,7 @@ export class ApiClient {
     path: string,
     schema: Schema<T>,
     options: {
-      method?: "GET" | "POST" | "PATCH" | "DELETE";
+      method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
       body?: unknown;
       signal?: AbortSignal;
     } = {},

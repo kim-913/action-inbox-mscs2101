@@ -26,6 +26,7 @@ import {
   useNow,
 } from "./ui";
 import { dueUrgency } from "./urgency";
+import { DisplayRange, useDisplayWindow, windowQuery } from "./display-window";
 
 export function Inbox({
   api,
@@ -37,15 +38,23 @@ export function Inbox({
   openEmail: (id: string) => void;
 }) {
   const cache = useQueryClient();
+  const display = useDisplayWindow();
   const action = useAction();
   const [startedRun, setStartedRun] = useState<SyncRun | null>(null);
   const [watch, setWatch] = useState(0);
   const inbox = useInfiniteQuery({
-    queryKey: ["private", "inbox"],
+    queryKey: [
+      "private",
+      "inbox",
+      "received",
+      display.identity,
+      display.recent,
+    ],
+    enabled: display.ready,
     initialPageParam: null as string | null,
     queryFn: ({ pageParam, signal }) =>
       api.request(
-        `${apiRoutes.inbox}?limit=100${pageParam ? `&cursor=${encodeURIComponent(pageParam)}` : ""}`,
+        `${apiRoutes.inbox}?limit=100&dateField=received&${windowQuery(display.recent)}${pageParam ? `&cursor=${encodeURIComponent(pageParam)}` : ""}`,
         inboxResponseSchema,
         { signal },
       ),
@@ -115,10 +124,11 @@ export function Inbox({
           Refresh inbox
         </button>
       </div>
+      <DisplayRange direction="recent" />
       <section className="mailbox surface" aria-labelledby="messages-heading">
         <div className="section-heading">
           <div>
-            <h2 id="messages-heading">Your inbox</h2>
+            <h2 id="messages-heading">Gmail inbox</h2>
             <p className="section-note">
               Every imported message stays readable, with or without
               suggestions.
@@ -252,15 +262,11 @@ export function Inbox({
             <div className="empty-symbol" aria-hidden="true">
               ↘
             </div>
-            <h3>
-              {running || (currentRun?.importedCount ?? 0) > 0
-                ? "Bringing your imported mail into view"
-                : "A quieter place for your next step"}
-            </h3>
+            <h3>No Gmail messages in this display window</h3>
             <p>
-              {running || (currentRun?.importedCount ?? 0) > 0
-                ? "The last sync reports imported messages. The saved inbox is refreshing; use Refresh inbox to check again without starting a new sync."
-                : "Sync Gmail to bring in recent messages. They stay readable even if automatic extraction is unavailable."}
+              Older saved messages are not deleted. Change the display window to
+              browse more received mail. Sync Gmail only when you want to import
+              new messages.
             </p>
           </div>
         )}

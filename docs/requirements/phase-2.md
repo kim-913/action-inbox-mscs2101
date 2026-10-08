@@ -39,6 +39,12 @@ Keep proposed suggestions, approved/manual tasks, existing imported events, foll
 
 Provide an undated/needs-review list beside the calendar rather than silently hiding those items or scheduling them on message receipt time. Overlapping events remain independently selectable. Support keyboard navigation, visible focus, accessible date/item labels, and source/status indicators that do not rely solely on color. Responsive layouts may use agenda as a compact presentation but must preserve access to all four views and details.
 
+### Implemented display-window increment
+
+The user separately approved one saved 7-day / 30-day / custom (1–365) display setting and source-separated views. The implemented increment uses browser-local calendar days: recent receipt dates for Gmail, upcoming due dates for tasks/proposals and Canvas assignments, and overlapping event intervals for Calendar/Canvas events. Undated work remains separate. Planner can isolate Gmail, Canvas, Google Calendar and manual tasks; matching filters run before pagination and do not delete data or expand import coverage. Account preference persistence, native dates, DST boundaries, source provenance and failures are covered by the evidence in [P0 implementation evidence](../testing/p0-evidence.md#shared-display-window-and-source-separation).
+
+This increment does not claim the complete P2-02 roadmap: persistent user-selected timezone, all four calendar layouts, additional connectors and notification delivery remain separate work.
+
 ## P2-03: reminder preferences and lifecycle
 
 The app must offer **1 day before, 2 days before, and custom lead time** preferences and an explicit “Enable notifications” entry point. Keep internal reminder scheduling separate from actual delivery capability. No preselected paid channel, silent OS permission prompt, or claim that metadata means a message was delivered.

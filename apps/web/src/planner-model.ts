@@ -6,6 +6,8 @@ import type {
   Task,
 } from "@action-inbox/contracts";
 
+export type PlannerSource = "all" | "gmail" | "canvas" | "calendar" | "manual";
+
 export type PlannerItem =
   | {
       kind: "task";
@@ -40,6 +42,7 @@ export function plannerItems(
   tasks: Task[],
   events: CalendarEvent[],
   canvasItems: CanvasItem[] = [],
+  selectedSource: PlannerSource = "all",
 ): PlannerItem[] {
   const sources = new Map(emails.map((email) => [email.id, email]));
   const eventsById = new Map(events.map((event) => [event.id, event]));
@@ -49,10 +52,18 @@ export function plannerItems(
   );
   const result: PlannerItem[] = [];
   for (const task of tasks) {
+    if (
+      selectedSource !== "all" &&
+      selectedSource !== (task.sourceEmailId ? "gmail" : "manual")
+    )
+      continue;
     // A completed task does not hide a real upcoming Calendar event.
     if (task.status === "Completed") continue;
     const eventId = task.calendarLink?.googleEventId;
-    const linkedEvent = eventId ? eventsById.get(eventId) : undefined;
+    const linkedEvent =
+      selectedSource === "all" && task.dueAt && eventId
+        ? eventsById.get(eventId)
+        : undefined;
     if (linkedEvent) linkedEventIds.add(linkedEvent.id);
     result.push({
       kind: "task",
@@ -66,6 +77,7 @@ export function plannerItems(
   for (const source of emails) {
     for (const suggestion of source.suggestions) {
       if (
+        (selectedSource === "all" || selectedSource === "gmail") &&
         suggestion.reviewState === "Proposed" &&
         !representedSuggestions.has(suggestion.id)
       )
@@ -79,7 +91,10 @@ export function plannerItems(
     }
   }
   for (const event of eventsById.values()) {
-    if (!linkedEventIds.has(event.id))
+    if (
+      (selectedSource === "all" || selectedSource === "calendar") &&
+      !linkedEventIds.has(event.id)
+    )
       result.push({
         kind: "event",
         key: `event:${event.id}`,
@@ -90,7 +105,10 @@ export function plannerItems(
   for (const item of new Map(
     canvasItems.map((item) => [item.id, item]),
   ).values()) {
-    if (!item.cancelled)
+    if (
+      (selectedSource === "all" || selectedSource === "canvas") &&
+      !item.cancelled
+    )
       result.push({
         kind: "canvas",
         key: `canvas:${item.id}`,
@@ -167,6 +185,49 @@ export function plannerSortTime(date: PlannerDate): number {
   }
   const timestamp = Date.parse(date.at);
   return Number.isFinite(timestamp) ? timestamp : Number.POSITIVE_INFINITY;
+}
+
+// Event membership uses overlap, while deadlines remain a single native day.
+// Never materialize a date-only event as a UTC-midnight instant.
+export function plannerOccursOnDay(item: PlannerItem, day: string): boolean {
+  const overlaps = (start: string, end: string | null, allDay: boolean) => {
+    if (!end) return plannerDay(start, allDay) === day;
+    if (allDay) return end > start ? start <= day && day < end : start === day;
+    const startAt = Date.parse(start);
+    const endAt = Date.parse(end);
+    if (endAt <= startAt) return plannerDay(start) === day;
+    const dayStart = new Date(`${day}T00:00:00`);
+    const dayEnd = new Date(dayStart);
+    dayEnd.setDate(dayEnd.getDate() + 1);
+    return startAt < dayEnd.getTime() && endAt > dayStart.getTime();
+  };
+  if (item.kind === "event")
+    return overlaps(item.event.start, item.event.end, item.event.allDay);
+  if (
+    item.kind === "canvas" &&
+    item.canvas.kind === "Event" &&
+    item.canvas.start
+  )
+    return overlaps(
+      item.canvas.start.value,
+      item.canvas.end?.value ?? null,
+      item.canvas.start.kind === "date",
+    );
+  if (item.kind === "task")
+    return (
+      (item.task.dueAt !== null && plannerDay(item.task.dueAt) === day) ||
+      Boolean(
+        item.linkedEvent &&
+        overlaps(
+          item.linkedEvent.start,
+          item.linkedEvent.end,
+          item.linkedEvent.allDay,
+        ),
+      )
+    );
+  return plannerDates(item).some(
+    (date) => plannerDay(date.at, date.allDay) === day,
+  );
 }
 
 export function needsDate(item: PlannerItem): boolean {

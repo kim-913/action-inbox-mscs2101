@@ -194,26 +194,33 @@ export async function serializeTask(
 const cursorSchema = z.strictObject({
   createdAt: z.iso.datetime({ offset: true }),
   id: z.uuid(),
+  filter: z.string().length(64),
 });
 export function decodeCursor(
   cursor: string | undefined,
+  filter: string,
 ): z.infer<typeof cursorSchema> | null {
   if (cursor === undefined) return null;
   try {
-    return parse(
+    const decoded = parse(
       cursorSchema,
       JSON.parse(Buffer.from(cursor, "base64url").toString("utf8")) as unknown,
     );
+    if (decoded.filter !== filter) throw new Error("Changed filters");
+    return decoded;
   } catch {
     throw new ApiFailure(400, "INVALID_REQUEST", "The page cursor is invalid.");
   }
 }
 
-export function encodeCursor(row: {
-  id: string;
-  cursor_created_at: string;
-}): string {
+export function encodeCursor(
+  row: {
+    id: string;
+    cursor_created_at: string;
+  },
+  filter: string,
+): string {
   return Buffer.from(
-    JSON.stringify({ createdAt: row.cursor_created_at, id: row.id }),
+    JSON.stringify({ createdAt: row.cursor_created_at, id: row.id, filter }),
   ).toString("base64url");
 }

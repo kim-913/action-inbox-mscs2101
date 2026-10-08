@@ -1,5 +1,9 @@
 import { useState } from "react";
-import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  useInfiniteQuery,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import {
   apiRoutes,
   calendarLinkSchema,
@@ -30,6 +34,7 @@ import {
   useNow,
 } from "./ui";
 import { compareTaskUrgency, taskUrgency } from "./urgency";
+import { DisplayRange, useDisplayWindow, windowQuery } from "./display-window";
 
 export function Tasks({
   api,
@@ -47,16 +52,19 @@ export function Tasks({
   createInitially?: boolean;
 }) {
   const [selectedId, setSelectedId] = useState<string | null>(initialTaskId);
+  const [source, setSource] = useState("all");
   const [creating, setCreating] = useState(
     createInitially || api.pendingTask !== null,
   );
+  const { ready, upcoming, identity } = useDisplayWindow();
   const now = useNow();
   const tasks = useInfiniteQuery({
-    queryKey: ["private", "tasks"],
+    queryKey: ["private", "tasks", "items", identity, upcoming, source],
+    enabled: ready,
     initialPageParam: null as string | null,
     queryFn: ({ pageParam, signal }) =>
       api.request(
-        `${apiRoutes.tasks}?limit=100${pageParam ? `&cursor=${encodeURIComponent(pageParam)}` : ""}`,
+        `${apiRoutes.tasks}?limit=100&${windowQuery(upcoming)}&includeUndated=true${source === "all" ? "" : `&source=${source}`}${pageParam ? `&cursor=${encodeURIComponent(pageParam)}` : ""}`,
         tasksResponseSchema,
         { signal },
       ),
@@ -65,9 +73,23 @@ export function Tasks({
   const orderedTasks = (
     tasks.data?.pages.flatMap((page) => page.items) ?? []
   ).sort((a, b) => compareTaskUrgency(a, b, now));
-  const activeCount = orderedTasks.filter(
-    (task) => task.status !== "Completed",
-  ).length;
+  const selectedInList = orderedTasks.some((task) => task.id === selectedId);
+  const detail = useQuery({
+    queryKey: ["private", "tasks", "detail", selectedId],
+    enabled: selectedId !== null && !selectedInList,
+    queryFn: ({ signal }) =>
+      api.request(route(apiRoutes.task, selectedId!), taskSchema, { signal }),
+  });
+  const groups = [
+    {
+      label: "Dated tasks in this window",
+      items: orderedTasks.filter((task) => task.dueAt !== null),
+    },
+    {
+      label: "Undated tasks",
+      items: orderedTasks.filter((task) => task.dueAt === null),
+    },
+  ];
   return (
     <section>
       <div className="page-heading">
@@ -77,6 +99,7 @@ export function Tasks({
           <p className="subtitle">
             Approved by you. Organized by due date, not an AI score.
           </p>
+          <DisplayRange direction="upcoming" />
         </div>
         <button
           aria-expanded={creating}
@@ -88,25 +111,33 @@ export function Tasks({
       {creating && <ManualTask api={api} />}
       <div className="surface task-workspace">
         <div className="section-heading">
-          <div>
-            <h2>Tasks</h2>
-            <p className="section-note">
-              {activeCount} active · {orderedTasks.length - activeCount}{" "}
-              completed
-              {tasks.hasNextPage ? " · More tasks available below" : ""}
-            </p>
-          </div>
+          <h2>Tasks</h2>
           <button
             className="secondary small"
-            onClick={() => void tasks.refetch()}
-            disabled={tasks.isFetching}
+            onClick={() => {
+              void tasks.refetch();
+              if (selectedId && !selectedInList) void detail.refetch();
+            }}
+            disabled={!ready || tasks.isFetching || detail.isFetching}
           >
             Reload tasks and versions
           </button>
         </div>
+        <label>
+          Task source
+          <select
+            value={source}
+            onChange={(event) => setSource(event.target.value)}
+          >
+            <option value="all">All tasks</option>
+            <option value="gmail">Gmail tasks</option>
+            <option value="manual">Manual tasks</option>
+          </select>
+        </label>
         <p className="urgency-explainer">
-          Overdue → today → next 7 days → later → no date. Completed tasks are
-          separate from urgency. No date does not mean low importance.
+          Dated tasks are limited to the upcoming window. Undated tasks are
+          separate and are not counted in that window. No date does not mean low
+          importance.
         </p>
         <ErrorNotice error={tasks.error} />
         {tasks.isPending && (
@@ -114,112 +145,85 @@ export function Tasks({
             Loading tasks…
           </p>
         )}
+        {selectedId && !selectedInList && (
+          <section aria-label="Selected task">
+            <h2>Selected task</h2>
+            <p className="section-note">
+              Opened directly, independently of the current date window, source
+              filter, and loaded pages. Not counted in the lists below.
+            </p>
+            <ErrorNotice error={detail.error} />
+            {detail.isPending && <p role="status">Loading selected task…</p>}
+            {detail.error && (
+              <button
+                className="secondary"
+                disabled={detail.isFetching}
+                onClick={() => void detail.refetch()}
+              >
+                Retry selected task
+              </button>
+            )}
+            {detail.data && (
+              <TaskItem
+                api={api}
+                task={detail.data}
+                now={now}
+                timezone={timezone}
+                connected={connected}
+                openEmail={openEmail}
+                expanded
+                onToggle={() => setSelectedId(null)}
+              />
+            )}
+            <button className="text-button" onClick={() => setSelectedId(null)}>
+              Close selected task
+            </button>
+          </section>
+        )}
         {tasks.data && orderedTasks.length === 0 && (
           <div className="empty-state">
-            <div className="empty-symbol" aria-hidden="true">
-              ✓
-            </div>
-            <h3>Your next step starts here</h3>
+            <h3>No tasks match this view</h3>
             <p>
-              Approve a suggestion from Inbox or create a task yourself. Nothing
-              is added automatically.
+              Try another source or display window, approve a suggestion from
+              Inbox, or create a task yourself. Nothing is added automatically.
             </p>
             <button className="secondary" onClick={() => setCreating(true)}>
-              Create your first task
+              Create a task
             </button>
           </div>
         )}
-        <div className="task-list">
-          {orderedTasks.map((task) => {
-            const urgency = taskUrgency(task, now);
-            const expanded = selectedId === task.id;
-            return (
-              <article
-                key={task.id}
-                className={`task-item ${expanded ? "selected" : ""} ${task.status === "Completed" ? "is-completed" : ""}`}
-              >
-                <button
-                  className="task-row"
-                  aria-expanded={expanded}
-                  aria-controls={`task-editor-${task.id}`}
-                  onClick={() => setSelectedId(expanded ? null : task.id)}
-                >
-                  <span
-                    className={`task-marker ${task.status === "Completed" ? "done" : ""}`}
-                    aria-hidden="true"
-                  >
-                    {task.status === "Completed" ? "✓" : ""}
-                  </span>
-                  <span className="row-copy">
-                    <strong>{task.title}</strong>
-                    <small>
-                      {task.status}
-                      {task.dueAt
-                        ? ` · ${displayDate(task.dueAt)}`
-                        : " · No due date"}
-                      {task.sourceEmailId ? " · From email" : " · Manual task"}
-                    </small>
-                  </span>
-                  <span className={`pill ${urgency.tone}`}>
-                    {urgency.label}
-                  </span>
-                  <span className="expand-mark" aria-hidden="true">
-                    {expanded ? "−" : "+"}
-                  </span>
-                </button>
-                {expanded && (
-                  <div className="task-detail" id={`task-editor-${task.id}`}>
-                    <TaskEditor key={task.version} api={api} task={task} />
-                    {task.sourceEmailId ? (
-                      <button
-                        className="text-button source-link"
-                        onClick={() => openEmail(task.sourceEmailId!)}
-                      >
-                        View source email and evidence{" "}
-                        <span aria-hidden="true">→</span>
-                      </button>
-                    ) : (
-                      <p className="hint">
-                        Manually created task · no source email
-                      </p>
-                    )}
-                    <details className="editor-disclosure">
-                      <summary>
-                        In-app reminder metadata{" "}
-                        <span>Stored only · no delivery</span>
-                      </summary>
-                      <ReminderEditor api={api} taskId={task.id} />
-                      {task.reminders.map((reminder) => (
-                        <ReminderEditor
-                          key={`${reminder.id}:${reminder.scheduledAt}:${reminder.status}`}
-                          api={api}
-                          taskId={task.id}
-                          reminder={reminder}
-                        />
-                      ))}
-                    </details>
-                    <details className="editor-disclosure">
-                      <summary>
-                        Google Calendar event{" "}
-                        <span>
-                          {task.calendarLink?.status === "Created"
-                            ? "Created"
-                            : "Requires your confirmation"}
-                        </span>
-                      </summary>
-                      <EventCreator
-                        api={api}
-                        task={task}
-                        timezone={timezone}
-                        connected={connected}
-                      />
-                    </details>
-                  </div>
-                )}
-              </article>
-            );
-          })}
-        </div>
+        {groups.map(({ label, items }) => {
+          const activeCount = items.filter(
+            (task) => task.status !== "Completed",
+          ).length;
+          return (
+            <section key={label} aria-label={label}>
+              <h3>{label}</h3>
+              <p className="section-note">
+                {items.length} loaded · {activeCount} active ·{" "}
+                {items.length - activeCount} completed
+                {tasks.hasNextPage ? " · More tasks available below" : ""}
+              </p>
+              <div className="task-list">
+                {items.map((task) => (
+                  <TaskItem
+                    key={task.id}
+                    api={api}
+                    task={task}
+                    now={now}
+                    timezone={timezone}
+                    connected={connected}
+                    openEmail={openEmail}
+                    expanded={selectedId === task.id}
+                    onToggle={() =>
+                      setSelectedId(selectedId === task.id ? null : task.id)
+                    }
+                  />
+                ))}
+              </div>
+            </section>
+          );
+        })}
         {tasks.hasNextPage && (
           <button
             className="load-more secondary"
@@ -231,6 +235,104 @@ export function Tasks({
         )}
       </div>
     </section>
+  );
+}
+
+function TaskItem({
+  api,
+  task,
+  now,
+  timezone,
+  connected,
+  openEmail,
+  expanded,
+  onToggle,
+}: {
+  api: ApiClient;
+  task: Task;
+  now: Date;
+  timezone: string;
+  connected: boolean;
+  openEmail: (id: string) => void;
+  expanded: boolean;
+  onToggle: () => void;
+}) {
+  const urgency = taskUrgency(task, now);
+  return (
+    <article
+      className={`task-item ${expanded ? "selected" : ""} ${task.status === "Completed" ? "is-completed" : ""}`}
+    >
+      <button
+        className="task-row"
+        aria-expanded={expanded}
+        aria-controls={`task-editor-${task.id}`}
+        onClick={onToggle}
+      >
+        <span
+          className={`task-marker ${task.status === "Completed" ? "done" : ""}`}
+          aria-hidden="true"
+        >
+          {task.status === "Completed" ? "✓" : ""}
+        </span>
+        <span className="row-copy">
+          <strong>{task.title}</strong>
+          <small>
+            {task.status}
+            {task.dueAt ? ` · ${displayDate(task.dueAt)}` : " · No due date"}
+            {task.sourceEmailId ? " · From email" : " · Manual task"}
+          </small>
+        </span>
+        <span className={`pill ${urgency.tone}`}>{urgency.label}</span>
+        <span className="expand-mark" aria-hidden="true">
+          {expanded ? "−" : "+"}
+        </span>
+      </button>
+      {expanded && (
+        <div className="task-detail" id={`task-editor-${task.id}`}>
+          <TaskEditor key={task.version} api={api} task={task} />
+          {task.sourceEmailId ? (
+            <button
+              className="text-button source-link"
+              onClick={() => openEmail(task.sourceEmailId!)}
+            >
+              View source email and evidence <span aria-hidden="true">→</span>
+            </button>
+          ) : (
+            <p className="hint">Manually created task · no source email</p>
+          )}
+          <details className="editor-disclosure">
+            <summary>
+              In-app reminder metadata <span>Stored only · no delivery</span>
+            </summary>
+            <ReminderEditor api={api} taskId={task.id} />
+            {task.reminders.map((reminder) => (
+              <ReminderEditor
+                key={`${reminder.id}:${reminder.scheduledAt}:${reminder.status}`}
+                api={api}
+                taskId={task.id}
+                reminder={reminder}
+              />
+            ))}
+          </details>
+          <details className="editor-disclosure">
+            <summary>
+              Google Calendar event{" "}
+              <span>
+                {task.calendarLink?.status === "Created"
+                  ? "Created"
+                  : "Requires your confirmation"}
+              </span>
+            </summary>
+            <EventCreator
+              api={api}
+              task={task}
+              timezone={timezone}
+              connected={connected}
+            />
+          </details>
+        </div>
+      )}
+    </article>
   );
 }
 

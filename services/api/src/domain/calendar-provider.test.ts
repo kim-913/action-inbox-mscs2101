@@ -60,6 +60,18 @@ describe("Calendar provider boundary", () => {
     ]);
   });
 
+  it("rejects a provider response above the bounded 100-event snapshot", () => {
+    const items = Array.from({ length: 100 }, (_, index) => ({
+      id: `event-${index}`,
+      start: { date: "2026-12-05" },
+      end: { date: "2026-12-06" },
+    }));
+    expect(parseUpcoming({ items })).toHaveLength(100);
+    expect(() =>
+      parseUpcoming({ items: [...items, { ...items[0], id: "overflow" }] }),
+    ).toThrow(ApiFailure);
+  });
+
   it.each([
     {
       items: [

@@ -96,4 +96,20 @@ describe("API liveness", () => {
     );
     expect(denied.headers["access-control-allow-origin"]).not.toBe("*");
   });
+  it("allows the authenticated display preference PUT preflight", async () => {
+    const response = await application().inject({
+      method: "OPTIONS",
+      url: "/v1/preferences/display",
+      headers: {
+        origin: "http://127.0.0.1:5173",
+        "access-control-request-method": "PUT",
+        "access-control-request-headers": "content-type,x-csrf-token",
+      },
+    });
+    expect(response.statusCode).toBe(204);
+    expect(response.headers["access-control-allow-methods"]).toContain("PUT");
+    expect(response.headers["access-control-allow-headers"]).toContain(
+      "X-CSRF-Token",
+    );
+  });
 });

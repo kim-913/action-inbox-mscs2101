@@ -5,26 +5,37 @@ import {
 } from "@action-inbox/contracts";
 import { type ApiClient, RequestError, safeExternalLink } from "./api/client";
 import { ErrorNotice, displayDate } from "./ui";
+import { DisplayRange, useDisplayWindow, windowQuery } from "./display-window";
 
 export function Calendar({ api }: { api: ApiClient }) {
+  const { ready, upcoming, identity } = useDisplayWindow();
   const calendar = useQuery({
-    queryKey: ["private", "calendar"],
+    queryKey: ["private", "calendar", "items", identity, upcoming, "google"],
+    enabled: ready,
     queryFn: ({ signal }) =>
-      api.request(apiRoutes.upcoming, upcomingCalendarResponseSchema, {
-        signal,
-      }),
+      api.request(
+        `${apiRoutes.upcoming}?${windowQuery(upcoming)}`,
+        upcomingCalendarResponseSchema,
+        { signal },
+      ),
   });
   const providerError = calendar.data?.error;
   return (
     <section>
       <h1>Upcoming Google Calendar events</h1>
+      <DisplayRange direction="upcoming" />
       <p>
         Events are created only from an approved or manual task with your
         explicit confirmation in Tasks.
       </p>
+      <p className="section-note">
+        Bounded provider snapshot: at most 100 Google Calendar events. This is
+        not a complete calendar history; events overlapping the selected window
+        are shown, including all-day events in their source dates.
+      </p>
       <button
         onClick={() => void calendar.refetch()}
-        disabled={calendar.isFetching}
+        disabled={!ready || calendar.isFetching}
       >
         {calendar.isFetching ? "Refreshing…" : "Refresh calendar"}
       </button>
@@ -52,7 +63,7 @@ export function Calendar({ api }: { api: ApiClient }) {
       </p>
       {calendar.isPending && <p role="status">Loading calendar…</p>}
       {calendar.data?.items.length === 0 && (
-        <p>No upcoming events in the available calendar data.</p>
+        <p>No events overlap this window in the available provider snapshot.</p>
       )}
       {calendar.data?.items.map((event) => {
         const external = safeExternalLink(event.htmlLink);

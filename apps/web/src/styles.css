@@ -1672,3 +1672,64 @@ dd {
     gap: 0;
   }
 }
+
+.display-window {
+  margin-bottom: 24px;
+  padding: 20px 24px;
+}
+.display-window h2 {
+  margin: 0 0 6px;
+  font-size: 17px;
+}
+.display-window-fields {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 12px;
+  border: 0;
+  padding: 12px 0 0;
+  margin: 0;
+}
+.display-window-fields legend {
+  padding: 12px 0 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+.display-window-fields label {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+}
+.display-window-fields select,
+.display-window-fields input {
+  min-height: 42px;
+  max-width: 190px;
+}
+.display-range {
+  color: var(--muted);
+  line-height: 1.6;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.source-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 18px 0;
+}
+.source-tabs button {
+  min-height: 44px;
+}
+.source-tabs button[aria-pressed="true"],
+.source-tabs button[aria-selected="true"] {
+  background: var(--accent);
+  color: white;
+}
+@media (max-width: 760px) {
+  .display-window {
+    padding: 16px;
+  }
+  .display-window-fields > button {
+    width: 100%;
+  }
+}
