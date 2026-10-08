@@ -9,6 +9,7 @@ export default tseslint.config(
       "**/coverage/**",
       "**/.expo/**",
       ".omp/**",
+      ".local-preview/**",
     ],
   },
   js.configs.recommended,

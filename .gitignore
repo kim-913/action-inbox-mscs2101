@@ -26,3 +26,4 @@ npm-debug.log*
 # Local tooling and credentials
 .omp/
 .config/
+.local-preview/
