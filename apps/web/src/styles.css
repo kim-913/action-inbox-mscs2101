@@ -119,3 +119,130 @@ button:focus-visible {
     align-items: center;
   }
 }
+
+.app-header {
+  padding: 20px clamp(20px, 5vw, 64px);
+  background: white;
+  border-bottom: 1px solid #cbd7d0;
+}
+.brand {
+  color: #153e38;
+  font-size: 1.4rem;
+  font-weight: 750;
+}
+nav,
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-block: 16px;
+}
+nav button {
+  background: #e7eee9;
+  color: #193c36;
+}
+nav button[aria-current="page"] {
+  background: #153e38;
+  color: white;
+}
+.workspace {
+  width: min(960px, 100%);
+  margin: auto;
+  padding: 24px;
+}
+.workspace h1 {
+  font-size: clamp(1.8rem, 4vw, 2.6rem);
+}
+.panel,
+.confirmation {
+  background: white;
+  border: 1px solid #cbd7d0;
+  border-radius: 14px;
+  padding: 22px;
+  margin-block: 20px;
+  overflow-wrap: anywhere;
+}
+.subpanel {
+  border-top: 1px solid #cbd7d0;
+  padding-top: 18px;
+  margin-top: 22px;
+}
+fieldset {
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+label {
+  display: grid;
+  gap: 6px;
+  margin-block: 14px;
+  font-weight: 600;
+}
+input,
+select {
+  font: inherit;
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #778e83;
+  border-radius: 6px;
+  background: white;
+  color: #193c36;
+  min-height: 44px;
+}
+.check {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.check input {
+  width: 22px;
+  min-height: 22px;
+  flex-shrink: 0;
+}
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.text-button {
+  background: none;
+  color: #153e38;
+  padding: 0;
+  text-align: left;
+  text-decoration: underline;
+  overflow-wrap: anywhere;
+}
+.text-button:hover {
+  background: #e7eee9;
+}
+.error-notice,
+.warning {
+  padding: 12px 16px;
+  background: #fff0e5;
+  border-left: 4px solid #a0431c;
+  color: #692b14;
+}
+.source {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font: inherit;
+  background: white;
+  padding: 20px;
+  border: 1px solid #cbd7d0;
+}
+blockquote {
+  margin-inline: 0;
+  padding: 12px 18px;
+  border-left: 3px solid #527a66;
+  background: #eaf1eb;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+a {
+  color: #174d73;
+}
+input:focus-visible,
+select:focus-visible,
+a:focus-visible {
+  outline: 3px solid #b45614;
+  outline-offset: 3px;
+}

@@ -1,6 +1,6 @@
 # Browser P0 API contract
 
-The Zod schemas in `packages/contracts/src/p0.ts` are authoritative. They are specified ahead of backend implementation; only health is implemented in the baseline. No UI should claim provider functionality is available until the real endpoint succeeds.
+The Zod schemas in `packages/contracts/src/p0.ts` are authoritative and are consumed by the browser and implemented server routes. Provider operations use real adapters; no UI should claim availability until its endpoint succeeds. Local sanitized-provider evidence does not establish live Google or paid-model acceptance.
 
 ## Browser transport
 
@@ -37,6 +37,8 @@ OAuth callback outcome is `?auth=connected`, `?auth=denied`, or `?auth=failed`, 
 | POST `/v1/tasks/:id/calendar-event`      | `calendarEventCreateRequestSchema`                          | 200 `calendarLinkSchema`; only explicitly approved tasks, deterministic event ID across retries  |
 
 `requestId` in create bodies is a client-generated UUID idempotency key, distinct from server error correlation IDs. Reuse the same requestId when retrying the same intent. Version fields enforce optimistic concurrency; stale writes return 409 `CONFLICT`. Ownership is always derived from server session, never supplied in bodies. Unsupported/uncertain due dates stay nullable and visibly flagged; edited dates are a user decision rather than invented source evidence. Read/review/reference emails can legitimately have no suggestions.
+
+Calendar creation additionally uses a durable task-owned intent. After reload, an identical event-content retry can use a replacement client UUID and still reconciles the original Google event ID; changed content returns conflict. This prevents a lost in-memory request key from forcing a second external event.
 
 `POST /v1/sync/gmail` retries failed extractions for already persisted emails without overwriting approved/rejected decisions. Failed extraction sets the email's `extractionError` and prevents the containing run from reporting `Succeeded`; last successful data remains readable. Action and explicit-deadline support use separate `evidence` and `deadlineEvidence` fields.
 

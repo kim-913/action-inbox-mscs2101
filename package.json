@@ -2,6 +2,7 @@
   "name": "action-inbox",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "description": "Browser-first, evidence-backed action extraction from Gmail.",
   "workspaces": [
     "apps/*",
@@ -16,7 +17,9 @@
     "lint": "eslint .",
     "format:check": "prettier --check .",
     "format": "prettier --write .",
-    "db:migrate": "npm run db:migrate --workspace @action-inbox/api"
+    "db:migrate": "npm run db:migrate --workspace @action-inbox/api",
+    "evaluate": "tsx test-data/anonymized/evaluate.ts",
+    "smoke:local-providers": "tsx services/api/src/testing/browser-smoke.ts"
   },
   "engines": {
     "node": ">=22.12"

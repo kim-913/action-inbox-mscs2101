@@ -4,6 +4,13 @@ import { healthResponseSchema } from "@action-inbox/contracts";
 import { z } from "zod";
 import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
+import type pg from "pg";
+import rateLimit from "@fastify/rate-limit";
+import { apiErrorSchema } from "@action-inbox/contracts";
+import { ApiFailure, type ServerConfig } from "./runtime.js";
+import { registerAuth } from "./auth/index.js";
+import { registerPipeline } from "./pipeline/index.js";
+import { registerDomain } from "./domain/index.js";
 
 const packageMetadata = z
   .object({ version: z.string().min(1) })
@@ -13,9 +20,12 @@ const packageMetadata = z
     ),
   );
 
-export function buildApp(options: { webOrigin?: string } = {}) {
-  const webOrigin = new URL(options.webOrigin ?? "http://127.0.0.1:5173")
-    .origin;
+export function buildApp(
+  options: { webOrigin?: string; pool?: pg.Pool; config?: ServerConfig } = {},
+) {
+  const webOrigin = new URL(
+    options.config?.webOrigin ?? options.webOrigin ?? "http://127.0.0.1:5173",
+  ).origin;
   const app = Fastify({
     logger: false,
     genReqId: () => randomUUID(),
@@ -28,6 +38,32 @@ export function buildApp(options: { webOrigin?: string } = {}) {
     allowedHeaders: ["Content-Type", "X-CSRF-Token"],
   });
 
+  void app.register(rateLimit, {
+    max: 120,
+    timeWindow: "1 minute",
+    errorResponseBuilder: (request) => ({
+      code: "RATE_LIMITED",
+      message: "Too many requests. Please try again shortly.",
+      requestId: request.id,
+    }),
+  });
+  if (options.pool && options.config) {
+    const pool = options.pool;
+    const config = options.config;
+    void app.register(async (application) => {
+      const { requireUser, google } = await registerAuth(
+        application,
+        pool,
+        config,
+      );
+      const runtime = { pool, config, requireUser, google };
+      const pipeline = await registerPipeline(application, runtime);
+      application.addHook("onClose", async () => {
+        await pipeline.close();
+      });
+      await registerDomain(application, runtime);
+    });
+  }
   app.get(
     "/v1/health",
     {
@@ -51,10 +87,32 @@ export function buildApp(options: { webOrigin?: string } = {}) {
   );
 
   app.setErrorHandler((error, request, reply) => {
+    if (error instanceof ApiFailure) {
+      return reply.code(error.status).send(
+        apiErrorSchema.parse({
+          code: error.code,
+          message: error.message,
+          requestId: request.id,
+        }),
+      );
+    }
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      "statusCode" in error &&
+      error.statusCode === 429
+    ) {
+      return reply.code(429).send({
+        code: "RATE_LIMITED",
+        message: "Too many requests. Please try again shortly.",
+        requestId: request.id,
+      });
+    }
     const invalid =
-      error instanceof Error &&
-      (("validation" in error && error.validation !== undefined) ||
-        ("statusCode" in error && error.statusCode === 400));
+      error instanceof z.ZodError ||
+      (error instanceof Error &&
+        (("validation" in error && error.validation !== undefined) ||
+          ("statusCode" in error && error.statusCode === 400)));
     return reply.code(invalid ? 400 : 500).send({
       code: invalid ? "INVALID_REQUEST" : "INTERNAL_ERROR",
       message: invalid

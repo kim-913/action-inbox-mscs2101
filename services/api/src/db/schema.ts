@@ -13,6 +13,7 @@ export const users = pgTable(
   {
     id: uuid("id").defaultRandom().primaryKey(),
     email: text("email").notNull().unique(),
+    googleSubject: text("google_subject").unique(),
     displayName: text("display_name").notNull(),
     timezone: text("timezone").notNull().default("UTC"),
     createdAt: timestamp("created_at", { withTimezone: true })
@@ -28,6 +29,10 @@ export const users = pgTable(
       sql`${table.email} = lower(btrim(${table.email})) AND length(${table.email}) > 3`,
     ),
     check("users_timezone_present", sql`length(btrim(${table.timezone})) > 0`),
+    check(
+      "users_google_subject_present",
+      sql`${table.googleSubject} IS NULL OR length(${table.googleSubject}) > 0`,
+    ),
   ],
 );
 
@@ -104,5 +109,34 @@ export const oauthStates = pgTable(
       sql`${table.consumedAt} IS NULL OR (${table.consumedAt} >= ${table.createdAt} AND ${table.consumedAt} < ${table.expiresAt})`,
     ),
     index("oauth_states_expiry_idx").on(table.expiresAt),
+  ],
+);
+
+export const browserSessions = pgTable(
+  "browser_sessions",
+  {
+    sessionHash: text("session_hash").primaryKey(),
+    csrfHash: text("csrf_hash").notNull(),
+    userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  },
+  (table) => [
+    check(
+      "browser_session_hash_sha256",
+      sql`${table.sessionHash} ~ '^[a-f0-9]{64}$'`,
+    ),
+    check(
+      "browser_csrf_hash_sha256",
+      sql`${table.csrfHash} ~ '^[a-f0-9]{64}$'`,
+    ),
+    check(
+      "browser_session_expiry_order",
+      sql`${table.expiresAt} > ${table.createdAt}`,
+    ),
+    index("browser_sessions_expiry_idx").on(table.expiresAt),
+    index("browser_sessions_user_idx").on(table.userId),
   ],
 );

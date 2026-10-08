@@ -1,6 +1,6 @@
 # Action Inbox — Project Execution Plan
 
-Status: web-first implementation baseline (platform change approved 2026-10-07)
+Status: local web P0 implementation candidate; live Google, approved paid-model evaluation, reminder-delivery decision, and deployment acceptance remain open (platform change approved 2026-10-07)
 Course: MSCS2101-1 Software Engineering, Fall 2026  
 Team: four members; Member 1 is the primary software engineer  
 Target: browser-first course MVP and live demonstration on December 5, 2026

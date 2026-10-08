@@ -1,40 +1,39 @@
-import { z } from "zod";
+import pg from "pg";
 import { buildApp } from "./app.js";
+import { readConfiguration } from "./config.js";
+import { migrate } from "./db/migrate.js";
 
-const environment = z
-  .object({
-    API_HOST: z.string().min(1).default("127.0.0.1"),
-    API_PORT: z.coerce.number().int().min(1).max(65535).default(3000),
-    WEB_ORIGIN: z.url().default("http://127.0.0.1:5173"),
-  })
-  .safeParse(process.env);
-
-if (!environment.success) {
-  process.stderr.write(
-    "Invalid API_HOST, API_PORT, or WEB_ORIGIN configuration.\n",
-  );
-  process.exitCode = 1;
-} else {
-  const app = buildApp({ webOrigin: environment.data.WEB_ORIGIN });
-  const close = async () => {
-    await app.close();
-  };
+try {
+  const { config, host, port, databaseUrl } = readConfiguration(process.env);
+  const pool = databaseUrl
+    ? new pg.Pool({ connectionString: databaseUrl })
+    : undefined;
+  if (databaseUrl) await migrate(databaseUrl);
+  const app = buildApp({ config, ...(pool ? { pool } : {}) });
+  if (pool)
+    app.addHook("onClose", async () => {
+      await pool.end();
+    });
   process.once("SIGINT", () => {
-    void close();
+    void app.close();
   });
   process.once("SIGTERM", () => {
-    void close();
+    void app.close();
   });
   try {
-    await app.listen({
-      host: environment.data.API_HOST,
-      port: environment.data.API_PORT,
-    });
-    process.stdout.write("Action Inbox API listening.\n");
-  } catch {
-    process.stderr.write(
-      "API startup failed. Check the configured host and port.\n",
+    await app.listen({ host, port });
+    process.stdout.write(
+      databaseUrl
+        ? "Action Inbox API listening with database.\n"
+        : "Action Inbox API listening (health only; DATABASE_URL not configured).\n",
     );
-    process.exitCode = 1;
+  } catch {
+    await app.close();
+    throw new Error("API startup failed");
   }
+} catch {
+  process.stderr.write(
+    "API startup failed. Check deployment configuration and database connectivity; private details are not logged.\n",
+  );
+  process.exitCode = 1;
 }
