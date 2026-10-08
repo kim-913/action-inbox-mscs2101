@@ -17,3 +17,9 @@ The retention boundary fences every ingestion write by both the original running
 Reminder endpoints manage only in-app due metadata, clearly labelled as such. No notification scheduling or delivery success is implemented or claimed; AC-09 remains pending the user's delivery decision.
 
 Runtime composition supplies a PostgreSQL pool, validated deployment configuration, authenticated-user hook, and Google gateway to route modules. Tests inject local HTTP provider servers only at provider URL seams. OAuth/CSRF remains responsible for every authenticated mutation, including calls made through those seams. All installation and verification is centralized after parallel implementation lands.
+
+## Connected-planner presentation refinement
+
+The internal calendar/agenda can display source-linked proposals automatically after a consented import. A proposal is not an approved task or an externally created event. Keep undated/uncertain work visible outside date cells; never substitute receipt time or an event's start for a task deadline. Date-based urgency is not model confidence or user importance.
+
+Import and extraction are distinct outcomes: disabled extraction must leave imported original messages readable, with visible progress and a safe explanation. The browser consumes bounded cursor-paginated inbox/tasks and discloses partial loaded coverage with further-page controls. Google Calendar events remain separately labelled read-only scheduled items until a user explicitly requests a write. Native future provider dates require field-level provenance rather than invented text evidence; Outlook/Canvas are not implemented by this refinement.

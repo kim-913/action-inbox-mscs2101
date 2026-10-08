@@ -38,6 +38,10 @@ export async function registerAuth(
   app: FastifyInstance,
   pool: pg.Pool,
   config: ServerConfig,
+  queueInitialSync?: (
+    client: pg.PoolClient,
+    userId: string,
+  ) => Promise<unknown>,
 ): Promise<{ requireUser: preHandlerHookHandler; google: GoogleGateway }> {
   if (!app.hasRequestDecorator("cookies")) await app.register(cookie);
   const google = new GoogleProvider(pool, config);
@@ -298,6 +302,8 @@ export async function registerAuth(
           session.session_hash,
           user.id,
         );
+        // Consent starts one bounded import; the connection/session/job commit atomically.
+        await queueInitialSync?.(client, user.id);
         await client.query("COMMIT");
         sendSessionCookie(reply, config, issued);
         return redirect("connected");

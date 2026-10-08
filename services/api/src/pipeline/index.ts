@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { FastifyInstance } from "fastify";
+import type pg from "pg";
 import { PgBoss } from "pg-boss";
 import { z } from "zod";
 import {
@@ -31,10 +32,14 @@ const cursorSchema = z.strictObject({
 interface InboxRow extends EmailRow {
   received_cursor: string;
 }
+export interface SyncPipeline {
+  close(): Promise<void>;
+  enqueue(client: pg.PoolClient, userId: string): Promise<SyncRow>;
+}
 export async function registerPipeline(
   app: FastifyInstance,
   runtime: Runtime,
-): Promise<{ close(): Promise<void> }> {
+): Promise<SyncPipeline> {
   const boss = new PgBoss({
     db: { executeSql: (text, values) => runtime.pool.query(text, values) },
   });
@@ -87,44 +92,44 @@ export async function registerPipeline(
       "Background processing could not start.",
     );
   }
+  // Callers hold the user's row lock and commit the run and job together.
+  const enqueue = async (client: pg.PoolClient, userId: string) => {
+    const existing = await client.query<SyncRow>(
+      "SELECT * FROM sync_runs WHERE user_id=$1 AND status IN ('Queued','Running')",
+      [userId],
+    );
+    if (existing.rows[0]) return existing.rows[0];
+    const id = randomUUID();
+    const result = await client.query<SyncRow>(
+      "INSERT INTO sync_runs(id,user_id) VALUES($1,$2) RETURNING *",
+      [id, userId],
+    );
+    const queued = await boss.send(
+      QUEUE,
+      { runId: id, userId },
+      {
+        id,
+        retryLimit: 2,
+        retryDelay: 30,
+        expireInSeconds: 7200,
+        deadLetter: DEAD_QUEUE,
+        db: { executeSql: (text, values) => client.query(text, values) },
+      },
+    );
+    if (!queued)
+      throw new ApiFailure(
+        503,
+        "INTERNAL_ERROR",
+        "Synchronization could not be queued. Retry synchronization.",
+      );
+    return result.rows[0]!;
+  };
   const options = { preHandler: runtime.requireUser };
   app.post(apiRoutes.sync, options, async (request, reply) => {
     emptyRequestSchema.parse(request.body);
     const userId = authenticatedUser(request);
-    const run = await withConnectedUser(
-      runtime.pool,
-      userId,
-      async (client) => {
-        const existing = await client.query<SyncRow>(
-          "SELECT * FROM sync_runs WHERE user_id=$1 AND status IN ('Queued','Running')",
-          [userId],
-        );
-        if (existing.rows[0]) return existing.rows[0];
-        const id = randomUUID();
-        const result = await client.query<SyncRow>(
-          "INSERT INTO sync_runs(id,user_id) VALUES($1,$2) RETURNING *",
-          [id, userId],
-        );
-        const queued = await boss.send(
-          QUEUE,
-          { runId: id, userId },
-          {
-            id,
-            retryLimit: 2,
-            retryDelay: 30,
-            expireInSeconds: 7200,
-            deadLetter: DEAD_QUEUE,
-            db: { executeSql: (text, values) => client.query(text, values) },
-          },
-        );
-        if (!queued)
-          throw new ApiFailure(
-            503,
-            "INTERNAL_ERROR",
-            "Synchronization could not be queued. Retry synchronization.",
-          );
-        return result.rows[0]!;
-      },
+    const run = await withConnectedUser(runtime.pool, userId, (client) =>
+      enqueue(client, userId),
     );
     return reply.code(202).send(serializeRun(run));
   });
@@ -236,6 +241,7 @@ export async function registerPipeline(
     };
   });
   return {
+    enqueue,
     close: async () => {
       await boss.stop({ graceful: true, timeout: 30_000 });
     },

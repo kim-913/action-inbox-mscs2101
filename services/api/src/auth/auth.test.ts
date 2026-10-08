@@ -8,6 +8,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { sessionResponseSchema } from "@action-inbox/contracts";
 import { readConfiguration } from "../config.js";
 import { migrate } from "../db/migrate.js";
+import { registerPipeline } from "../pipeline/index.js";
 import {
   ApiFailure,
   authenticatedUser,
@@ -43,6 +44,7 @@ describe.skipIf(!databaseUrl)(
     const sessions = new Set<string>();
     const states = new Set<string>();
     let providerState: GoogleTestState;
+    let failInitialSync = false;
 
     beforeAll(async () => {
       if (!databaseUrl) throw new Error("TEST_DATABASE_URL required");
@@ -85,7 +87,13 @@ describe.skipIf(!databaseUrl)(
             .send({ code: error.code, message: error.message });
         return reply.code(500).send({ code: "INTERNAL_ERROR" });
       });
-      const auth = await registerAuth(app, pool, config);
+      const auth = await registerAuth(app, pool, config, (client, userId) => {
+        if (failInitialSync)
+          throw new ApiFailure(503, "INTERNAL_ERROR", "Import is unavailable.");
+        return pipeline.enqueue(client, userId);
+      });
+      const pipeline = await registerPipeline(app, { pool, config, ...auth });
+      app.addHook("onClose", () => pipeline.close());
       google = auth.google;
       app.post("/protected", { preHandler: auth.requireUser }, (request) => ({
         userId: authenticatedUser(request),
@@ -207,6 +215,11 @@ describe.skipIf(!databaseUrl)(
       current.csrf = info.csrfToken;
       expect(info.authenticated).toBe(true);
       expect(info.googleConnected).toBe(true);
+      const queued = await pool.query(
+        "SELECT j.data FROM sync_runs s JOIN pgboss.job j ON j.id=s.id WHERE s.user_id=$1 ORDER BY s.created_at DESC LIMIT 1",
+        [info.user!.id],
+      );
+      expect(queued.rows[0]?.data).toMatchObject({ userId: info.user!.id });
       expect(current.hash).not.toBe(original.hash);
       expect(
         (
@@ -218,6 +231,24 @@ describe.skipIf(!databaseUrl)(
       ).toBe(0);
       return { current, userId: info.user!.id };
     }
+
+    it("rolls back connection/session changes when automatic import cannot be queued", async () => {
+      const current = await browser();
+      const flow = await start(current);
+      failInitialSync = true;
+      try {
+        const response = await callback(current, flow);
+        expect(response.headers.location).toContain("auth=failed");
+        expect(response.headers["set-cookie"]).toBeUndefined();
+        const persisted = await pool.query(
+          "SELECT user_id FROM browser_sessions WHERE session_hash=$1",
+          [current.hash],
+        );
+        expect(persisted.rows).toEqual([{ user_id: null }]);
+      } finally {
+        failInitialSync = false;
+      }
+    });
 
     it("bootstraps without Google credentials and fails start explicitly", async () => {
       const unconfigured = Fastify();

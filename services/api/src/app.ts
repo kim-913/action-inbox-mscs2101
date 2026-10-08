@@ -55,6 +55,7 @@ export function buildApp(
         application,
         pool,
         config,
+        (client, userId) => pipeline.enqueue(client, userId),
       );
       const runtime = { pool, config, requireUser, google };
       const pipeline = await registerPipeline(application, runtime);

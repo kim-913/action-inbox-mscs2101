@@ -23,3 +23,9 @@ Browser-stored access/refresh tokens increase XSS impact. JWT sessions add revoc
 ## Consequences and verification
 
 The client initializes session state before login or mutation and refreshes its CSRF token after rotation. Same-origin web/API deployment is preferred. Tests must cover Origin rejection, CSRF mismatch, login-session binding, single-use/expired state, session fixation, and logout. Real Google and browser evidence remain pending until credentials and local integration are available.
+
+## Connected-planner consent refinement
+
+A successful Google callback queues one bounded initial Gmail import in the same PostgreSQL transaction as connection persistence and session rotation. The shared enqueue operation reuses an already queued/running import, and OAuth state remains single-use. Queue failure rolls back the connection/session change instead of presenting a connected-and-importing success. Merely opening the planner or reconnecting an existing browser session does not start a new import.
+
+Google consent grants source access, not permission to automatically create external events. Internal proposed items may be displayed without approval; task approval and explicit external Calendar confirmation remain separate. Outlook/Canvas are future source candidates with missing setup, not additional OAuth implementations. See `../testing/connector-prerequisites.md`.
