@@ -122,7 +122,11 @@ function download(url: string): Promise<string> {
               if (options.all) callback(null, [pinned]);
               else callback(null, pinned.address, pinned.family);
             },
-            headers: { accept: "text/calendar", "accept-encoding": "identity" },
+            headers: {
+              accept: "text/calendar",
+              "accept-encoding": "identity",
+              "user-agent": "ActionInbox/0.1 (Canvas calendar subscription)",
+            },
             maxHeaderSize: 16 * 1024,
           },
           (response) => {

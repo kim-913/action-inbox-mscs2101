@@ -442,7 +442,11 @@ describe("Canvas pinned HTTPS transport", () => {
       rejectUnauthorized: true,
       agent: false,
       family: 4,
-      headers: { "accept-encoding": "identity" },
+      headers: {
+        accept: "text/calendar",
+        "accept-encoding": "identity",
+        "user-agent": "ActionInbox/0.1 (Canvas calendar subscription)",
+      },
     });
     network.lookup.mockResolvedValue([{ address: "127.0.0.1", family: 4 }]);
     const callback = vi.fn();

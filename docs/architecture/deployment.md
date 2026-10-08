@@ -76,6 +76,8 @@ Initial connect and explicit manual Refresh are the only reads. The bounded impo
 
 Canvas limits the source's date window and result set independently of this app. Imported snapshot removal means only that an item is no longer in the current feed, not that coursework was completed or cancelled. Date-only assignments do not supply an exact due time. Grades, submissions and completion state are not imported. No external task/calendar write or notification delivery is triggered. Source descriptions are inert plain text and returned links cannot expose a feed URL.
 
+The HTTPS reader identifies itself as `ActionInbox/0.1 (Canvas calendar subscription)`. Sofia's public endpoint returned CloudFront 403 to an otherwise identical unidentified GET and a normal 302 login response to the identified client. Do not remove that header or impersonate a browser. After this correction was loaded, the user reported their real feed import working; no private course items were inspected. See `../testing/canvas-subscription-evidence.md` for the exact public diagnostic, focused regression and user-reported-success distinction.
+
 ## OpenAI cost boundary
 
 `OPENAI_ENABLED` defaults to `false`. Merely inheriting an `OPENAI_API_KEY` does not activate paid calls. Set `OPENAI_ENABLED=true` and provide a key only after the account owner explicitly approves usage and cost. `OPENAI_MODEL` defaults to `gpt-4.1-mini`. Disabled/missing provider configuration produces a visible safe extraction failure, not fabricated suggestions. Local provider-contract tests use synthetic HTTP responses and do not prove real model accuracy. The versioned evaluation harness must disclose which provider/predictions were actually evaluated.
