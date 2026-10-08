@@ -12,10 +12,13 @@ export function ErrorNotice({ error }: { error: unknown }) {
       </p>
       {error instanceof RequestError && (
         <>
-          <p>
-            Code: {error.code}
-            {error.requestId ? ` · Request: ${error.requestId}` : ""}
-          </p>
+          <details className="diagnostics">
+            <summary>Technical details</summary>
+            <p>
+              Code: {error.code}
+              {error.requestId ? ` · Request: ${error.requestId}` : ""}
+            </p>
+          </details>
           {error.code === "CONFLICT" && (
             <p>
               Another change was saved first. Reload this item before editing
@@ -23,7 +26,7 @@ export function ErrorNotice({ error }: { error: unknown }) {
             </p>
           )}
           {error.code === "GOOGLE_RECONNECT_REQUIRED" && (
-            <p>Reconnect Google from Account, then retry.</p>
+            <p>Reconnect Google from Connections, then retry.</p>
           )}
           {error.code === "CSRF_INVALID" && (
             <p>Reload the page to establish a fresh session, then retry.</p>
@@ -74,7 +77,11 @@ export function ActionNotice({ action }: { action: ActionState }) {
   return (
     <>
       <ErrorNotice error={action.error} />
-      <p role="status">{action.pending ? "Saving…" : action.message}</p>
+      {(action.pending || action.message) && (
+        <p className="action-status" role="status">
+          {action.pending ? "Saving…" : action.message}
+        </p>
+      )}
     </>
   );
 }
@@ -147,4 +154,13 @@ export function DueFields({
       </p>
     </fieldset>
   );
+}
+
+export function useNow() {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 60_000);
+    return () => clearInterval(timer);
+  }, []);
+  return now;
 }

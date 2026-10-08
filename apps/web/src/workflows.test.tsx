@@ -6,6 +6,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
@@ -453,6 +454,9 @@ describe("P0 browser interactions", () => {
     await api.session();
     const open = vi.fn();
     mount(<Tasks api={api} timezone="UTC" connected openEmail={open} />);
+    fireEvent.click(
+      await screen.findByRole("button", { name: /Send documents/ }),
+    );
     await screen.findByRole("button", { name: "Save task" });
     for (const status of ["Waiting for Reply", "Completed", "Pending"]) {
       fireEvent.change(screen.getByLabelText("Status"), {
@@ -470,6 +474,12 @@ describe("P0 browser interactions", () => {
       screen.getByRole("button", { name: "View source email and evidence" }),
     );
     expect(open).toHaveBeenCalledWith(id);
+    fireEvent.click(
+      screen.getByText("In-app reminder metadata", {
+        exact: false,
+        selector: "summary",
+      }),
+    );
     fireEvent.change(screen.getByLabelText("Reminder date and time (local)"), {
       target: { value: "2026-10-08T12:00" },
     });
@@ -526,6 +536,14 @@ describe("P0 browser interactions", () => {
           nextCursor: null,
           dataState: { lastSuccessfulSyncAt: null, latestSyncRun: null },
         });
+      if (path === "/v1/tasks")
+        return Response.json({ items: [], nextCursor: null });
+      if (path === "/v1/calendar/upcoming")
+        return Response.json({
+          items: [],
+          lastSuccessfulFetchAt: null,
+          error: null,
+        });
       if (path === "/v1/auth/logout") {
         loggedOut = true;
         return Response.json({ ok: true });
@@ -537,7 +555,11 @@ describe("P0 browser interactions", () => {
     );
     await screen.findByText("Signed in as Test User");
     cache.setQueryData(["private", "secret"], { body: "private data" });
-    fireEvent.click(screen.getByRole("button", { name: "Account" }));
+    fireEvent.click(
+      within(
+        screen.getByRole("navigation", { name: "Main navigation" }),
+      ).getByRole("button", { name: "Connections" }),
+    );
     fireEvent.click(screen.getByRole("button", { name: "Log out" }));
     expect(
       fetcher.mock.calls.some((call) => String(call[0]).endsWith("/logout")),

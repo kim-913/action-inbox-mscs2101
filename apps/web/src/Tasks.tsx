@@ -27,19 +27,30 @@ import {
   isoDate,
   localDateValue,
   useAction,
+  useNow,
 } from "./ui";
+import { compareTaskUrgency, taskUrgency } from "./urgency";
 
 export function Tasks({
   api,
   timezone,
   connected,
   openEmail,
+  initialTaskId = null,
+  createInitially = false,
 }: {
   api: ApiClient;
   timezone: string;
   connected: boolean;
   openEmail: (id: string) => void;
+  initialTaskId?: string | null;
+  createInitially?: boolean;
 }) {
+  const [selectedId, setSelectedId] = useState<string | null>(initialTaskId);
+  const [creating, setCreating] = useState(
+    createInitially || api.pendingTask !== null,
+  );
+  const now = useNow();
   const tasks = useInfiniteQuery({
     queryKey: ["private", "tasks"],
     initialPageParam: null as string | null,
@@ -51,55 +62,174 @@ export function Tasks({
       ),
     getNextPageParam: (page) => page.nextCursor ?? undefined,
   });
+  const orderedTasks = (
+    tasks.data?.pages.flatMap((page) => page.items) ?? []
+  ).sort((a, b) => compareTaskUrgency(a, b, now));
+  const activeCount = orderedTasks.filter(
+    (task) => task.status !== "Completed",
+  ).length;
   return (
     <section>
-      <h1>Tasks and in-app due metadata</h1>
-      <ManualTask api={api} />
-      <button onClick={() => void tasks.refetch()} disabled={tasks.isFetching}>
-        Reload tasks and versions
-      </button>
-      <ErrorNotice error={tasks.error} />
-      {tasks.isPending && <p role="status">Loading tasks…</p>}
-      {tasks.data?.pages[0]?.items.length === 0 && (
-        <p>No tasks yet. Create one or approve an inbox suggestion.</p>
-      )}
-      {tasks.data?.pages
-        .flatMap((page) => page.items)
-        .map((task) => (
-          <article className="panel" key={task.id}>
-            <TaskEditor key={task.version} api={api} task={task} />
-            {task.sourceEmailId ? (
-              <button onClick={() => openEmail(task.sourceEmailId!)}>
-                View source email and evidence
-              </button>
-            ) : (
-              <p>Manually created task · no source email</p>
-            )}
-            <ReminderEditor api={api} taskId={task.id} />
-            {task.reminders.map((reminder) => (
-              <ReminderEditor
-                key={`${reminder.id}:${reminder.scheduledAt}:${reminder.status}`}
-                api={api}
-                taskId={task.id}
-                reminder={reminder}
-              />
-            ))}
-            <EventCreator
-              api={api}
-              task={task}
-              timezone={timezone}
-              connected={connected}
-            />
-          </article>
-        ))}
-      {tasks.hasNextPage && (
+      <div className="page-heading">
+        <div>
+          <p className="eyebrow">Make room for progress</p>
+          <h1>Your next steps</h1>
+          <p className="subtitle">
+            Approved by you. Organized by due date, not an AI score.
+          </p>
+        </div>
         <button
-          disabled={tasks.isFetchingNextPage}
-          onClick={() => void tasks.fetchNextPage()}
+          aria-expanded={creating}
+          onClick={() => setCreating((value) => !value)}
         >
-          Load more tasks
+          {creating ? "Close new task" : "+ New task"}
         </button>
-      )}
+      </div>
+      {creating && <ManualTask api={api} />}
+      <div className="surface task-workspace">
+        <div className="section-heading">
+          <div>
+            <h2>Tasks</h2>
+            <p className="section-note">
+              {activeCount} active · {orderedTasks.length - activeCount}{" "}
+              completed
+              {tasks.hasNextPage ? " · More tasks available below" : ""}
+            </p>
+          </div>
+          <button
+            className="secondary small"
+            onClick={() => void tasks.refetch()}
+            disabled={tasks.isFetching}
+          >
+            Reload tasks and versions
+          </button>
+        </div>
+        <p className="urgency-explainer">
+          Overdue → today → next 7 days → later → no date. Completed tasks are
+          separate from urgency. No date does not mean low importance.
+        </p>
+        <ErrorNotice error={tasks.error} />
+        {tasks.isPending && (
+          <p className="empty-state" role="status">
+            Loading tasks…
+          </p>
+        )}
+        {tasks.data && orderedTasks.length === 0 && (
+          <div className="empty-state">
+            <div className="empty-symbol" aria-hidden="true">
+              ✓
+            </div>
+            <h3>Your next step starts here</h3>
+            <p>
+              Approve a suggestion from Inbox or create a task yourself. Nothing
+              is added automatically.
+            </p>
+            <button className="secondary" onClick={() => setCreating(true)}>
+              Create your first task
+            </button>
+          </div>
+        )}
+        <div className="task-list">
+          {orderedTasks.map((task) => {
+            const urgency = taskUrgency(task, now);
+            const expanded = selectedId === task.id;
+            return (
+              <article
+                key={task.id}
+                className={`task-item ${expanded ? "selected" : ""} ${task.status === "Completed" ? "is-completed" : ""}`}
+              >
+                <button
+                  className="task-row"
+                  aria-expanded={expanded}
+                  aria-controls={`task-editor-${task.id}`}
+                  onClick={() => setSelectedId(expanded ? null : task.id)}
+                >
+                  <span
+                    className={`task-marker ${task.status === "Completed" ? "done" : ""}`}
+                    aria-hidden="true"
+                  >
+                    {task.status === "Completed" ? "✓" : ""}
+                  </span>
+                  <span className="row-copy">
+                    <strong>{task.title}</strong>
+                    <small>
+                      {task.status}
+                      {task.dueAt
+                        ? ` · ${displayDate(task.dueAt)}`
+                        : " · No due date"}
+                      {task.sourceEmailId ? " · From email" : " · Manual task"}
+                    </small>
+                  </span>
+                  <span className={`pill ${urgency.tone}`}>
+                    {urgency.label}
+                  </span>
+                  <span className="expand-mark" aria-hidden="true">
+                    {expanded ? "−" : "+"}
+                  </span>
+                </button>
+                {expanded && (
+                  <div className="task-detail" id={`task-editor-${task.id}`}>
+                    <TaskEditor key={task.version} api={api} task={task} />
+                    {task.sourceEmailId ? (
+                      <button
+                        className="text-button source-link"
+                        onClick={() => openEmail(task.sourceEmailId!)}
+                      >
+                        View source email and evidence{" "}
+                        <span aria-hidden="true">→</span>
+                      </button>
+                    ) : (
+                      <p className="hint">
+                        Manually created task · no source email
+                      </p>
+                    )}
+                    <details className="editor-disclosure">
+                      <summary>
+                        In-app reminder metadata{" "}
+                        <span>Stored only · no delivery</span>
+                      </summary>
+                      <ReminderEditor api={api} taskId={task.id} />
+                      {task.reminders.map((reminder) => (
+                        <ReminderEditor
+                          key={`${reminder.id}:${reminder.scheduledAt}:${reminder.status}`}
+                          api={api}
+                          taskId={task.id}
+                          reminder={reminder}
+                        />
+                      ))}
+                    </details>
+                    <details className="editor-disclosure">
+                      <summary>
+                        Google Calendar event{" "}
+                        <span>
+                          {task.calendarLink?.status === "Created"
+                            ? "Created"
+                            : "Requires your confirmation"}
+                        </span>
+                      </summary>
+                      <EventCreator
+                        api={api}
+                        task={task}
+                        timezone={timezone}
+                        connected={connected}
+                      />
+                    </details>
+                  </div>
+                )}
+              </article>
+            );
+          })}
+        </div>
+        {tasks.hasNextPage && (
+          <button
+            className="load-more secondary"
+            disabled={tasks.isFetchingNextPage}
+            onClick={() => void tasks.fetchNextPage()}
+          >
+            Load more tasks
+          </button>
+        )}
+      </div>
     </section>
   );
 }
@@ -200,9 +330,9 @@ function TaskEditor({ api, task }: { api: ApiClient; task: Task }) {
         });
       }}
     >
-      <h2>{task.title}</h2>
-      <p>
-        {task.status} · Due: {displayDate(task.dueAt)} · Version {task.version}
+      <h3>Task details</h3>
+      <p className="hint">
+        Due: {displayDate(task.dueAt)} · Version {task.version}
       </p>
       <DueFields
         title={title}
@@ -503,7 +633,7 @@ export function EventCreator({
           : "Create confirmed calendar event"}
       </button>
       {!connected && (
-        <p>Reconnect Google in Account before creating an event.</p>
+        <p>Reconnect Google in Connections before creating an event.</p>
       )}
       <p className="hint">
         Approval alone never creates a calendar event. Failed requests retain

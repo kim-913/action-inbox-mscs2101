@@ -1,10 +1,10 @@
 # Local web P0 evidence — 2026-10-07 Pacific / 2026-10-08 UTC
 
-## Scope and final central results
+## Earlier candidate: scope and central results
 
-This is a local implementation candidate, **not a completed release**. Production adapters call Google and OpenAI; verification used an actual PostgreSQL database, actual listening HTTP servers, and explicitly sanitized local provider fixtures. No real Google authorization, Google console/Workspace write, paid model request, Canvas write, or remote publication occurred.
+This is a local implementation candidate, **not a completed release**. Production adapters call Google and OpenAI; the earlier verification below used an actual PostgreSQL database, actual listening HTTP servers, and explicitly sanitized local provider fixtures. No real Google authorization, Google console/Workspace write, paid model request, Canvas write, or remote publication occurred in that earlier verification. Later owner-authorized Google setup and the user's own real sign-in/import are documented separately in `google-setup-evidence.md` and the deployment guide; they are not synthetic browser-test evidence.
 
-Final centralized commands after all security corrections:
+Earlier centralized commands after the security corrections (these counts do not by themselves verify the subsequent UI redesign):
 
 - `npm run typecheck`: passed all workspaces.
 - `npm run lint`: passed.
@@ -65,4 +65,53 @@ The checked-in `anonymized-v1` dataset contains exactly **50** synthetic labelle
 | AC-13 performance          | Responsive baseline browser observation only                                                          | Designated browser/device with 100 populated messages, measured 2-second target |
 | AC-14 traceability         | This table links P0 acceptance to tests and evidence                                                  | Final course report sections and non-author review                              |
 
-Live Google Web-client configuration, an approved paid-model account/run, HTTPS same-site hosting, reminder delivery, full performance measurement, and final team/course review remain explicit release gates.
+All-user Google acceptance, an approved paid-model account/run, HTTPS same-site hosting, reminder delivery, full performance measurement, and final team/course review remain explicit release gates. The local Web client is configured; that does not complete those wider gates.
+
+## Redesign inspection and safety boundary
+
+The user's reported real preview contained 94 imported messages, zero processed, disabled AI extraction, and an apparently empty inbox. That report is accepted as ground truth; no agent inspected the user's stored message content or re-ran their Gmail sync to reproduce it.
+
+The redesign rehearsal used a separate disposable PostgreSQL container on loopback 55433, test database `action_inbox_test`, browser database `action_inbox_smoke`, synthetic API 3002, and a built production web preview on 5174. Persistent user data on PostgreSQL volume/port 55432 was not used for tests. The browser used a new dedicated profile and only a synthetic `demo@example.test` identity. The default rehearsal explicitly disabled extraction; no real Google, Calendar, or paid-model request was needed.
+
+An immediate intermediate browser inspection identified a concrete visual defect while files were being edited: new navigation/dashboard markup was being served alongside the previous stylesheet. The resulting unbounded, black-filled SVG logo, missing sidebar layout, and concatenated card content appeared at desktop and 390px widths. Temporary diagnostic screenshots were `/tmp/action-inbox-current-desktop.png` and `/tmp/action-inbox-current-390.png`; these are defect evidence, not final UI acceptance screenshots.
+
+The separate one-case ordinary ChatGPT website experiment is recorded in `subscription-experiment.md`. Its correct source quotes and deadline are not application-schema or API-integration evidence; its returned category does not match the application enum. API extraction remains disabled.
+
+### Final centralized redesign results
+
+- `npm run typecheck`: passed all workspaces.
+- `npm run lint`: passed. Private `.local-preview` browser-profile artifacts are now excluded from ESLint and Prettier; they are not application source.
+- Focused web regressions: **21 passed**; focused OAuth/pipeline PostgreSQL regressions: **17 passed**. The initially failing paused-poll test had garbage-collected its unobserved seeded cache; its fixture lifecycle was corrected rather than weakening the runtime pause condition.
+- Final `TEST_DATABASE_URL=… npm test`: **169 passed** — 62 web, 98 API/provider/database/evaluation, 9 contracts. All PostgreSQL suites used the separate disposable database; none were skipped.
+- `npm run format:check`: passed. Both isolated (`VITE_API_URL=http://127.0.0.1:3002`) and user (`http://127.0.0.1:3000`) production builds passed. The same upstream TanStack/Zod non-fatal bundler warnings remain.
+- Explicit `git check-ignore` confirmed root/web environment files, Google credentials, and private preview configuration are ignored. Only explicitly named source/docs/synthetic screenshots were staged; unrelated `.Rhistory` and private browser/session files were excluded. The earlier credential-pattern scan is not presented as a new comprehensive audit.
+
+### Actual production-build browser observations
+
+1. A fresh synthetic OAuth callback automatically queued the initial import without pressing Sync. The first readable source appeared at **1 imported / 0 processed while still running**; completion left **6 imported / 0 processed**, with clear disabled-extraction text. Reading original text and Connections preserved the distinction between a successful Google connection and unavailable interpretation.
+2. SQL counts in the disposable fixture database after this import were six messages, **zero suggestions, zero tasks, zero created-event links, and one sync run**. No action/date was fabricated and no external write followed consent.
+3. A separate explicitly selected loopback synthetic Responses provider produced six structured proposals on reconnect, with no additional imported copies. This is synthetic contract evidence, not paid/live AI or subscription integration.
+4. Source detail showed exact matching action and deadline quotations, an unconfirmed due time, and editable review controls. A user-style form edit and explicit approval produced one task; a database count still showed **zero Calendar links**. The task was moved to Waiting for Reply.
+5. The Calendar-create button was disabled before its confirmation checkbox. After explicit confirmation, the actual local provider created one event with a different scheduled day from the task's due date. Planner folded that event into its task identity while showing both date meanings. No real Google Calendar was written.
+6. Actual forms created a dated manual task and an undated manual task. Planner showed Today, Waiting for reply, Needs review, and Needs a date without inventing importance from confidence or receipt time. Week navigation/day selection and source/task detail actions were exercised.
+7. A synthetic `+09:00` event rendered on the correct prior local day in America/Los_Angeles; a date-only event retained its calendar date/all-day label. Browser inspection found and corrected an all-day sorting bug: the sort now uses a local-day presentation key, not UTC midnight, without converting the date-only event into a deadline. A timezone regression was added before the final 169-test run.
+8. Browser-only HTTP 503 interception of the synthetic Calendar read produced a readable safe error while retaining prior tasks/events. Removing interception and using Refresh plan recovered. This fault injection is not a live-provider outage claim.
+9. Adding 101 explicitly synthetic pagination tasks to the disposable database exercised the real API cursor: the UI disclosed **100 loaded tasks / partial plan**, and Load more tasks reached **104 loaded tasks**. This is pagination coverage, not a 100-message performance benchmark.
+10. Desktop (1440px) and mobile (390px) captures were visually inspected. The mobile document width equalled 390px with no horizontal overflow. The earlier HMR stylesheet mismatch and case-insensitive component/helper module collision were corrected; the user preview now serves a built application rather than exposing in-flight HMR edits.
+
+Final synthetic screenshot files:
+
+- `redesign-planner-desktop.png`, `redesign-planner-390.png`
+- `redesign-inbox-desktop.png`, `redesign-inbox-390.png`
+- `redesign-import-progress.png`
+- `redesign-source-desktop.png`, `redesign-source-390.png`
+- `redesign-connections-390.png`
+- `redesign-planner-error-390.png`
+
+The 60-update polling pause is component-test evidence; the browser run did not wait through 60 real polling intervals. Browser automation's datetime fill produced malformed input once; the rehearsal then set valid native form values and dispatched input/change events before clicking the real confirmation control. No app validation was bypassed.
+
+### Preserved live preview and release limits
+
+After verification, safe live status metadata showed zero active imports and `OPENAI_ENABLED=false`. The API launchd service was restarted to load the verified callback code; the web launchd service was changed to stable `vite preview` on the same 5173 origin. A fresh anonymous profile confirmed an unauthenticated session and valid production rendering with no HMR script. No user-authenticated page, private message content, provider token, or real sync/Calendar operation was accessed. The persistent Docker volume and user sessions/data remain in place; only the owned disposable test container/services/browser profiles were stopped/removed.
+
+Outlook/Canvas, additional calendar views, flight specialization, notification delivery, and optional SMS are **approved Phase 2 plans**, not enabled features. `../requirements/phase-2.md` supplies future acceptance gates. The one-case subscription experiment does not enable the app API. Paid extraction, AC-09 delivery, all-user provider acceptance, and the performance/accuracy release gates remain unresolved.
