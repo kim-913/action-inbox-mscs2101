@@ -1,0 +1,9 @@
+BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Action Inbox//Synthetic Truncated Response//EN
+BEGIN:VEVENT
+DTSTAMP:20261008T120000Z
+UID:event-assignment-101
+DTSTART:20261015T180000Z
+DTEND:20261015T180000Z
+SUMMARY:Synthetic incomplete response must not replace a successful snapshot

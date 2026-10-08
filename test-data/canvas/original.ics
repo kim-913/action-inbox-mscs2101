@@ -1,0 +1,56 @@
+BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Action Inbox//Handcrafted Canvas Convention Fixture//EN
+CALSCALE:GREGORIAN
+METHOD:PUBLISH
+X-WR-CALNAME:Synthetic Learner Calendar (Canvas)
+X-WR-CALDESC:Calendar events for the user\, Synthetic Learner
+BEGIN:VEVENT
+DTSTAMP:20261008T120000Z
+UID:event-assignment-101
+DTSTART:20261015T180000Z
+DTEND:20261015T180000Z
+CLASS:PUBLIC
+SUMMARY:Synthetic design brief [SYNTH-101]
+DESCRIPTION:Prepare a diagram\, explanation\; and notes.\nUse folder C:\\demo.
+ This sentence continues on a folded content line.
+X-ALT-DESC;FMTTYPE=text/html:<p>Synthetic description only.</p>
+URL:https://canvas.example.invalid/calendar?include_contexts=course_9001&
+ month=10&year=2026#assignment_101
+SEQUENCE:0
+END:VEVENT
+BEGIN:VEVENT
+DTSTAMP:20261008T120000Z
+UID:event-calendar-event-201
+DTSTART:20261016T160000Z
+DTEND:20261016T173000Z
+CLASS:PUBLIC
+SUMMARY:Synthetic workshop [SYNTH-101]
+DESCRIPTION:Discuss the design. This scheduled event is not an assignment.
+LOCATION:Studio 4\, Example Building
+URL:https://canvas.example.invalid/calendar?include_contexts=course_9001&
+ month=10&year=2026#calendar_event_201
+SEQUENCE:0
+END:VEVENT
+BEGIN:VEVENT
+DTSTAMP:20261008T120000Z
+UID:event-calendar-event-202
+DTSTART;VALUE=DATE:20261017
+CLASS:PUBLIC
+SUMMARY:Synthetic reading day [SYNTH-101]
+URL:https://canvas.example.invalid/calendar?include_contexts=course_9001&
+ month=10&year=2026#calendar_event_202
+SEQUENCE:0
+END:VEVENT
+BEGIN:VEVENT
+DTSTAMP:20261008T120000Z
+UID:event-assignment-override-301
+DTSTART;VALUE=DATE:20261018
+CLASS:PUBLIC
+SUMMARY:Synthetic reflection (Synthetic section) [SYNTH-101]
+DESCRIPTION:The feed exposes a date only\; exact due time is unavailable.
+URL:https://canvas.example.invalid/calendar?include_contexts=course_9001&
+ month=10&year=2026#assignment_102
+SEQUENCE:0
+END:VEVENT
+END:VCALENDAR

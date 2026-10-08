@@ -11,6 +11,8 @@ import { ApiFailure, type ServerConfig } from "./runtime.js";
 import { registerAuth } from "./auth/index.js";
 import { registerPipeline } from "./pipeline/index.js";
 import { registerDomain } from "./domain/index.js";
+import { registerCanvas } from "./canvas/index.js";
+import type { CanvasFeedReader } from "./canvas/feed.js";
 
 const packageMetadata = z
   .object({ version: z.string().min(1) })
@@ -21,7 +23,12 @@ const packageMetadata = z
   );
 
 export function buildApp(
-  options: { webOrigin?: string; pool?: pg.Pool; config?: ServerConfig } = {},
+  options: {
+    webOrigin?: string;
+    pool?: pg.Pool;
+    config?: ServerConfig;
+    canvasFeedReader?: CanvasFeedReader;
+  } = {},
 ) {
   const webOrigin = new URL(
     options.config?.webOrigin ?? options.webOrigin ?? "http://127.0.0.1:5173",
@@ -63,6 +70,7 @@ export function buildApp(
         await pipeline.close();
       });
       await registerDomain(application, runtime);
+      await registerCanvas(application, runtime, options.canvasFeedReader);
     });
   }
   app.get(

@@ -1,0 +1,31 @@
+BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Action Inbox//Synthetic Nonprovider Robustness Cases//EN
+BEGIN:VEVENT
+DTSTAMP:20261008T120000Z
+UID:synthetic-undated
+SUMMARY:Synthetic undated event not emitted by inspected Canvas exporter
+END:VEVENT
+BEGIN:VEVENT
+DTSTAMP:20261008T120000Z
+UID:synthetic-recurrence
+DTSTART:20261019T140000Z
+DTEND:20261019T150000Z
+SUMMARY:Synthetic unsupported recurrence
+RRULE:FREQ=DAILY;COUNT=3
+END:VEVENT
+BEGIN:VEVENT
+DTSTAMP:20261008T120000Z
+UID:synthetic-cancelled
+DTSTART:20261020T140000Z
+SUMMARY:Synthetic cancelled event not emitted by inspected Canvas exporter
+STATUS:CANCELLED
+END:VEVENT
+BEGIN:VEVENT
+DTSTAMP:20261008T120000Z
+UID:synthetic-zoned
+DTSTART;TZID=America/Los_Angeles:20261102T090000
+DTEND;TZID=America/Los_Angeles:20261102T100000
+SUMMARY:Synthetic named-zone input not emitted by inspected Canvas exporter
+END:VEVENT
+END:VCALENDAR

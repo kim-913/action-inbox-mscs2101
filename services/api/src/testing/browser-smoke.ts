@@ -1,11 +1,14 @@
 // Explicit test harness: never imported by server.ts or production adapters.
 import { randomBytes } from "node:crypto";
 import { setTimeout as delay } from "node:timers/promises";
+import { readFileSync } from "node:fs";
 import pg from "pg";
 import { buildApp } from "../app.js";
 import { readConfiguration } from "../config.js";
 import { migrate } from "../db/migrate.js";
 import { createGoogleTestProvider } from "../auth/provider.test-support.js";
+import { parseCanvasFeed } from "../canvas/feed.js";
+import { ApiFailure } from "../runtime.js";
 
 const connectionString = process.env.TEST_DATABASE_URL;
 if (!connectionString || process.env.NODE_ENV === "production") {
@@ -53,11 +56,27 @@ const events = new Map<string, Record<string, unknown>>([
 ]);
 const message =
   "Please submit registration documents by 2026-10-16T17:00:00-07:00.";
+let canvasMode: "original" | "changed" | "unavailable" = "original";
 const provider = await createGoogleTestProvider({
   email: "demo@example.test",
   subject: "synthetic-browser-demo",
   redirectUri: `http://127.0.0.1:${apiPort}/v1/auth/google/callback`,
   configure(app) {
+    app.get("/canvas/calendar.ics", async (_request, reply) => {
+      if (canvasMode === "unavailable")
+        return reply.code(503).send("Synthetic provider unavailable");
+      const body = readFileSync(
+        new URL(
+          `../../../../test-data/canvas/${canvasMode}.ics`,
+          import.meta.url,
+        ),
+        "utf8",
+      ).replaceAll(
+        "https://canvas.example.invalid/",
+        "https://sofia.instructure.com/",
+      );
+      return reply.type("text/calendar").send(body);
+    });
     app.get("/gmail/v1/users/me/messages", async () => ({
       messages,
     }));
@@ -169,7 +188,34 @@ const config = {
   openaiBaseUrl: `${provider.origin}/v1`,
   openaiModel: "synthetic-http-provider",
 };
-const app = buildApp({ pool, config });
+const app = buildApp({
+  pool,
+  config,
+  canvasFeedReader: async () => {
+    const response = await fetch(`${provider.origin}/canvas/calendar.ics`, {
+      redirect: "error",
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (!response.ok)
+      throw new ApiFailure(
+        503,
+        "CANVAS_UNAVAILABLE",
+        "Canvas is temporarily unavailable. Retry refresh.",
+      );
+    return parseCanvasFeed(await response.text());
+  },
+});
+// Test-only orchestration route: never registered by production server.ts.
+app.post<{ Body: { mode: string } }>(
+  "/__smoke/canvas-mode",
+  (request, reply) => {
+    const mode = request.body.mode;
+    if (mode !== "original" && mode !== "changed" && mode !== "unavailable")
+      return reply.code(400).send({ ok: false });
+    canvasMode = mode;
+    return { ok: true };
+  },
+);
 app.addHook("onClose", async () => {
   await provider.app.close();
   await pool.end();
