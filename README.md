@@ -2,6 +2,12 @@
 
 Action Inbox is a browser-first, source-linked connected planner. Consented Gmail imports remain readable and feed an internal calendar/agenda with evidence-backed proposals when extraction is available. Proposals, approved/manual tasks, and existing external Calendar events remain distinct; an internal suggestion is not permission to create a task or external event. Reminder delivery remains pending: stored in-app due metadata is not a delivered notification.
 
+## Contributors: start here
+
+Read the **[Contributor guide](CONTRIBUTING.md)** for local setup, a credential-free synthetic workspace, development/review steps, course deliverables, and troubleshooting.
+
+Choose your role: [Developer](skills/developer/SKILL.md) · [UI Designer](skills/ui-designer/SKILL.md) · [QA](skills/qa/SKILL.md) · [PM](skills/pm/SKILL.md). For agent work, start with [AGENTS.md](AGENTS.md) and the [task/handoff template](docs/templates/agent-task.md). Role assignments are separate from repository permissions.
+
 ## Status
 
 The repository is hosted privately at [kim-913/mscs2101](https://github.com/kim-913/mscs2101) with the project owner's approval. Keep credentials, local data, and handoff notes out of Git; do not make the repository public without separate approval. The browser/API implementation includes cookie-based Google login, bounded durable Gmail import, source review, tasks, an internal planner, a separate read-only Sofia Canvas calendar subscription, explicit external Calendar approval, and retention controls. The user reported successful real Google sign-in/import and, after the identified-client fix, successful real Canvas import. This is not all-user provider or paid-model acceptance. Paid extraction remains disabled. See `docs/architecture/api-contract.md`, `docs/architecture/deployment.md`, `docs/testing/p0-evidence.md`, and `docs/testing/canvas-subscription-evidence.md` for observed checks and limits.
@@ -40,25 +46,9 @@ Canvas disconnect deletes this app's saved feed and imported items only; it does
 
 ## Local setup
 
-The already-configured user preview at 5173 is served by launchd from a verified **production build**, not HMR. Do not run the development commands below on top of those live ports. Use isolated development/test services and follow `docs/architecture/deployment.md` for deliberate verified updates; rebuilding with the synthetic API URL must never replace the user-facing build.
+Use the **[Contributor guide setup](CONTRIBUTING.md#3-local-setup-choose-a-mode)** as the canonical onboarding procedure. It provides an authenticated synthetic workspace without real provider credentials, separate database-test setup, and the approved real-provider path.
 
-```bash
-npm install
-cp .env.example .env
-npm run dev:api
-```
-
-In another terminal:
-
-```bash
-VITE_API_URL=http://127.0.0.1:3000 npm run dev:web -- --host 127.0.0.1
-```
-
-Open `http://127.0.0.1:5173` (matching the API's `WEB_ORIGIN`). Vite reads `VITE_API_URL` from exported shell variables or `apps/web/.env`, not the root `.env`. Set it explicitly to the local API, `http://127.0.0.1:3000`; an absent value produces an actionable configuration error rather than guessing an endpoint. Browser requests include cookie credentials; CORS permits only the configured web origin.
-
-For database-backed work, configure `DATABASE_URL` in root `.env`, then run `npm run db:migrate`. Migrations are transactional, checksum-tracked, and protected by a database advisory lock. `/v1/health` reports process liveness, not database or provider readiness.
-
-`OPENAI_ENABLED=false` is the default even when a key exists in the environment. Enable paid extraction only after explicit account-owner approval. Google login requires an approved Web application OAuth client, an exact registered backend callback, a test-account allowlist, and a 32-byte AES key; see `.env.example` comments and ADR-003.
+The owner's persistent preview uses web 5173 / API 3000 / database 55432 and serves a production build, not HMR. Do not reuse those services or overwrite `apps/web/dist`. Contributor development uses separate services, a disposable database, and an isolated browser profile. Deployment remains a separate action governed by [deployment configuration](docs/architecture/deployment.md).
 
 The browser supports login/logout/session rotation, inbox/source evidence, edit/approve/reject, manual task creation and status updates, retained last-success error states, explicit calendar creation/upcoming events, and disconnect/delete. Create intents live only in memory and private drafts/cache are cleared when authentication ends. Reminder controls store labelled in-app due metadata only, not delivered notifications.
 

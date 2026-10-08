@@ -350,16 +350,18 @@ Required cross-review:
 - At least one non-author reviews every course document and significant code change before it is considered complete.
 - All members participate in the proposal pitch, final presentation, and oral defense.
 
-## 12. Engineering workflow while local-only
+## 12. Engineering workflow
 
-1. Keep the authoritative source tree in `mscs2101`.
-2. Store documents intended for team review in the dedicated Drive project folder.
-3. Use dated Drive exports or document version history for shared-document revisions.
-4. Before coding begins, initialize local Git for atomic commits only if the user approves; do not configure a remote.
-5. Maintain one active milestone and a small reviewed task list; no untracked side features.
-6. For each behavior: requirement -> design/ADR if needed -> implementation -> focused test -> actual browser/API smoke -> documentation update.
-7. Record AI-assisted work in weekly standups: task, tool, human review performed, test evidence, and corrections made.
-8. Never place `.env`, OAuth credentials, refresh tokens, raw private emails, or non-anonymized test data in Drive documents or a future repository.
+The owner approved private GitHub publication on 2026-10-08. The repository is [kim-913/mscs2101](https://github.com/kim-913/mscs2101); the earlier local-only/no-remote restriction is superseded. See [CONTRIBUTING.md](CONTRIBUTING.md) for current setup and review procedures, [AGENTS.md](AGENTS.md) for the agent entry point, and the linked role Skills for role-specific execution.
+
+1. Keep the authoritative source and sanitized technical documentation in the private repository.
+2. Use short-lived branches and reviewed pull requests; stage only owned files and preserve shared history. Branch protection and CI are not claimed to be configured.
+3. Documents maintained in the dedicated Drive project folder need dated/versioned exports and links in the task or traceability record; do not let competing copies silently become authoritative.
+4. Maintain one active milestone and a small reviewed task list; no untracked side features.
+5. For each behavior: requirement -> design/ADR if needed -> implementation -> focused test -> actual browser/API smoke -> documentation update.
+6. Record AI-assisted work in weekly standups: task, tool, human review performed, test evidence, and corrections made.
+7. Never place `.env`, OAuth credentials, refresh tokens, private feed URLs, raw private content, local session handoffs, or non-anonymized test data in shared documents or Git.
+8. Keep role ownership distinct from GitHub permissions. At least one non-author reviews significant code changes and course documents. Source publication is not deployment or permission to submit to Canvas.
 
 ### Change control
 
