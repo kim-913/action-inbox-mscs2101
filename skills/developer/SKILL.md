@@ -48,7 +48,7 @@ Resolve implementation facts from code and existing decisions first. Ask the own
 
 Follow [CONTRIBUTING.md](../../CONTRIBUTING.md) for the canonical branch, synchronization, CI, and merge procedure. PRs require **zero approvals**: the author may self-review and squash-merge after `Quality gate` succeeds on the latest commit, current `main` is integrated, the diff is conflict-free, and conversations are resolved. GitHub does not permit self-approval; self-review is not an approval event. Technical peer review is optional, not a merge gate. Required verification and any separately recorded non-author course-artifact review remain obligations; merging does not satisfy them.
 
-These are mandatory team rules, not server-enforced branch protection. Protection access for this private repository returns HTTP 403 under the current plan; CI cannot prevent direct pushes or premature merges. Keep the repository private and follow the contributor guide rather than claiming enforcement.
+The repository is public with enforced `main` protection, including for administrators: PRs, successful required `Quality gate` checks against up-to-date `main`, resolved conversations, and linear history are required; force pushes to and deletion of `main` are blocked. Required approvals remain zero. Anyone may read, fork, and propose a PR, but only authorized writers may push repository branches or merge eligible PRs. Public source does not deploy the application or authorize access to user data. Follow the contributor guide for the canonical policy.
 
 ## Workflow
 
@@ -65,7 +65,7 @@ These are mandatory team rules, not server-enforced branch protection. Protectio
 - Preserve the running preview on 5173, API on 3000, and persistent PostgreSQL on 55432. Do not restart/replace them, change live `.env` settings or encryption keys, or overwrite `apps/web/dist` with a synthetic-API build. Use the isolated ports, database, and separate output directory documented in CONTRIBUTING and deployment guidance.
 - Never read private mail/course items, saved user sessions, secret calendar feeds, or private browser profiles to diagnose an issue. Use synthetic/anonymized fixtures. Do not ask for credentials or feed URLs in chat, or place them in logs, screenshots, commits, or handoffs.
 - Keep paid extraction disabled unless the account owner explicitly approves API usage/cost; an existing key or ChatGPT subscription is not authorization. Do not trigger real synchronization, Calendar writes, account deletion, or provider revocation as an incidental test.
-- Do not publish the private repository, rewrite history, submit course artifacts, or modify unrelated user changes. Stop and escalate destructive/security risks rather than weakening validation to make a test pass.
+- Do not change repository visibility, weaken protection, publish private contributor/user data, rewrite history, submit course artifacts, or modify unrelated user changes. Stop and escalate destructive/security risks rather than weakening validation to make a test pass.
 
 ## Handoff template
 

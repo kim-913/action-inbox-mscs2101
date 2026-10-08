@@ -4,7 +4,7 @@ Use this structure in a sanitized GitHub issue, PR, or agent prompt. Replace the
 
 Follow [CONTRIBUTING.md](../../CONTRIBUTING.md) for canonical setup, branch ownership, synchronization, verification, and merge instructions. PRs require **zero approvals**: the author may self-review and squash-merge after `Quality gate` succeeds on the latest commit, current `main` is integrated, the diff is conflict-free, and conversations are resolved. GitHub cannot self-approve; self-review is not an approval event. Technical peer review is optional. Required verification and any separately required non-author course-artifact review must remain explicit; neither is replaced by merging a PR.
 
-These are mandatory team rules, not server-enforced branch protection: protection access returns HTTP 403 for this private repository under the current plan. Keep the repository private; CI cannot prevent direct pushes or premature merges.
+The repository is public with enforced `main` protection, including for administrators: PRs, successful required `Quality gate` checks against up-to-date `main`, resolved conversations, and linear history are required; force pushes to and deletion of `main` are blocked. Required approvals remain zero. Anyone may read, fork, and propose a PR, but only authorized writers may push repository branches or merge eligible PRs. Public source does not deploy the application or authorize account testing or disclosure of private contributor/user data. Use the contributor guide for the canonical policy.
 
 ## Assignment
 

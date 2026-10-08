@@ -7,12 +7,12 @@ Target: browser-first course MVP and live demonstration on December 5, 2026
 
 ## 1. Operating constraints
 
-- Authoritative source and sanitized technical documentation are maintained in the private repository `kim-913/action-inbox-mscs2101`; local work uses the contributor's own checkout, with course artifacts also maintained in the team's dedicated Google Drive folder.
-- Do not create, publish, or connect a public GitHub repository until the team explicitly decides to do so.
+- Authoritative source and sanitized technical documentation are maintained in the public repository `kim-913/action-inbox-mscs2101`; local work uses the contributor's own checkout, with course artifacts also maintained in the team's dedicated Google Drive folder.
+- Public source visibility is explicitly authorized. Anyone can read, clone, fork, and propose PRs; only authorized writers can push repository branches or merge. This does not authorize publishing credentials, private user data, or local handoff notes.
 - Do not submit, post, message, or modify anything in Canvas without the user’s explicit confirmation for that specific action.
 - Do not use browser UI automation for Canvas, Google Drive, or Google Docs. Use the authenticated local Google Workspace MCP integration; any unavoidable interactive sign-in must use the user's default Arc browser.
-- Private GitHub publication was authorized on 2026-10-08. Follow the canonical branch/PR policy in [CONTRIBUTING.md](CONTRIBUTING.md); public publication remains unauthorized.
-- The application is a classroom web MVP for four named test users, not a public release.
+- Public GitHub publication and classic `main` protection were enabled on 2026-10-08 with the owner's approval. Follow the canonical branch/PR policy in [CONTRIBUTING.md](CONTRIBUTING.md): PRs, the GitHub Actions `Quality gate` check, strict up-to-date branches, resolved conversations, and linear history are enforced, including for administrators; force pushes and `main` deletion are disabled. Squash is the only merge method, with automatic merged-branch deletion. Required approvals are zero, with no code-owner or last-push approval requirement; authors with write permission may self-review and self-merge. Independent non-author course-document review remains a separate evidence requirement.
+- The application is a classroom web MVP for four named test users, not a public app release. Public source publication is not deployment, access to user data, or authorization for real-account testing.
 - The team will use Google OAuth testing mode and pre-register all test accounts.
 - The product is browser-first, using React. Native mobile builds and Expo are outside the revised platform scope.
 
@@ -352,9 +352,9 @@ Required course/evaluation cross-review (separate from GitHub merge approvals):
 
 ## 12. Engineering workflow
 
-The owner approved private GitHub publication on 2026-10-08. The repository is [kim-913/action-inbox-mscs2101](https://github.com/kim-913/action-inbox-mscs2101); the earlier local-only/no-remote restriction is superseded. See [CONTRIBUTING.md](CONTRIBUTING.md) for current setup and review procedures, [AGENTS.md](AGENTS.md) for the agent entry point, and the linked role Skills for role-specific execution.
+The owner approved public GitHub visibility on 2026-10-08 after the initial private publication. The repository is [kim-913/action-inbox-mscs2101](https://github.com/kim-913/action-inbox-mscs2101); earlier local-only/private-only restrictions are superseded. See [CONTRIBUTING.md](CONTRIBUTING.md) for current setup and review procedures, [AGENTS.md](AGENTS.md) for the agent entry point, and the linked role Skills for role-specific execution.
 
-1. Keep the authoritative source and sanitized technical documentation in the private repository.
+1. Keep the authoritative source and sanitized technical documentation in the public repository; keep private configuration, user data, and local handoff notes out of Git.
 2. Use short-lived `feature/*`, `fix/*`, `docs/*`, or `chore/*` branches and one coherent PR to `main`; stage only owned files. Coordinate overlapping work and one integration owner. Never directly push or force-push `main`, or rewrite shared branches; synchronize with `git fetch origin` and `git merge origin/main`, resolving conflicts with affected owners.
 3. Documents maintained in the dedicated Drive project folder need dated/versioned exports and links in the task or traceability record; do not let competing copies silently become authoritative.
 4. Maintain one active milestone and a small reviewed task list; no untracked side features.
@@ -365,9 +365,9 @@ The owner approved private GitHub publication on 2026-10-08. The repository is [
 
 The canonical commands and PR steps are in [CONTRIBUTING.md section 4](CONTRIBUTING.md#4-implement-review-and-prove-a-change). [`.github/workflows/ci.yml`](.github/workflows/ci.yml) defines workflow `CI`, stable job/check `Quality gate`, on pull requests, pushes to `main`, and manual dispatch. On Node.js 22/npm 11 it runs `npm ci`, `npm run typecheck`, `npm run lint`, `npm run format:check`, full `npm test` with disposable PostgreSQL 16 `TEST_DATABASE_URL` and no database-suite skips, then an isolated web production build. It needs no real secrets/providers and performs no deployment.
 
-**Current enforcement limitation (2026-10-08):** the private repository's GitHub protection API returned HTTP 403: `Upgrade to GitHub Pro or make this repository public to enable this feature.` Keep the repository private. These are mandatory team policies, not server-enforced protection; CI cannot prevent direct pushes or policy-violating self-merges. If the plan later supports private-repository protection, require PRs, current-main integration, resolved conversations, and `Quality gate`, with **zero required approvals**. GitHub cannot accept an author's approval of their own PR; self-review is not an approval event.
+**Enforced main protection (2026-10-08):** GitHub requires PRs, strict up-to-date branches, resolved conversations, linear history, and the GitHub Actions `Quality gate` check (app ID `15368`), including for administrators. Force pushes and deletion of `main` are disabled. Required approvals are **zero**, with no code-owner or last-push approval requirement. Authors with repository write permission may self-merge once these gates pass; GitHub does not accept an author's approval of their own PR, and self-review is not an approval event.
 
-Configured GitHub settings allow squash merges only, disable merge-commit/rebase merging, delete merged branches automatically, and enable branch updates and Actions. Both protection and ruleset APIs are unavailable under the current plan; no paid upgrade or public publication is authorized.
+Configured GitHub settings allow squash merges only, disable merge-commit/rebase merging, delete merged branches automatically, and enable branch updates and Actions. Public readers may clone, fork, and propose PRs, but do not gain write/merge access. Public source publication does not authorize a paid upgrade, app deployment, real-account testing, or disclosure of private user data.
 
 ### Change control
 

@@ -36,7 +36,7 @@ Do not redefine technical truth, waive a failed gate without an approved scope/c
 
 [CONTRIBUTING.md](../../CONTRIBUTING.md) is canonical for branch ownership, synchronization, CI, and merge procedure. Require **zero PR approvals**: authors may self-review and squash-merge after `Quality gate` succeeds on the latest commit, current `main` is integrated, the diff is conflict-free, and conversations are resolved. GitHub does not allow self-approval; do not assign an author to approve their own PR. Technical peer review is optional, while required verification and the course-artifact non-author reviews below remain separate obligations. A merged PR is not proof of course or release acceptance.
 
-Protection access for the private repository returns HTTP 403 under the current plan. Record these as mandatory team rules, not server-enforced branch protection; CI cannot prevent direct pushes or premature merges. Keep the repository private.
+Record the repository as public with enforced `main` protection, including for administrators: PRs, successful required `Quality gate` checks against up-to-date `main`, resolved conversations, and linear history are required; force pushes to and deletion of `main` are blocked. Required approvals remain zero. Anyone may read, fork, and propose a PR; only authorized writers may push repository branches or merge eligible PRs. Public source is not application deployment or permission to share private contributor/user data. Keep planning artifacts sanitized and use the contributor guide as the canonical policy.
 
 ## Recorded course-deliverable map
 

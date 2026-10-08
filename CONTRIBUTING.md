@@ -1,6 +1,6 @@
 # Contributor guide
 
-Start here to work on Action Inbox as a teammate or coding agent. The repository is private: [kim-913/action-inbox-mscs2101](https://github.com/kim-913/action-inbox-mscs2101). Repository access does **not** grant Google test-user access, Canvas access, permission to spend money, or permission to deploy.
+Start here to work on Action Inbox as a teammate or coding agent. The repository is public with the owner's explicit approval: [kim-913/action-inbox-mscs2101](https://github.com/kim-913/action-inbox-mscs2101). Anyone can read, clone, fork, and propose PRs; only authorized writers can push repository branches or merge. Public source access does **not** grant access to app user data, Google test-user access, Canvas access, permission to spend money, or permission to deploy.
 
 ## 1. Pick your role
 
@@ -42,7 +42,7 @@ Read [README](README.md) for product status and [EXECUTION_PLAN](EXECUTION_PLAN.
 
 Use Node.js **22.12+**, npm **11+**, Git, and a current browser. Docker with PostgreSQL 16 is needed for the authenticated synthetic workspace and database tests. Commands below use a POSIX shell, from the repository root unless stated otherwise; on Windows use WSL2.
 
-Accept the repository invitation first, then:
+No invitation or GitHub authentication is required to clone the public repository:
 
 ```bash
 git clone https://github.com/kim-913/action-inbox-mscs2101.git
@@ -168,16 +168,16 @@ Without database configuration the API can provide health only; `/v1/health` suc
 
    Resolve conflicts with affected owners, inspect the entire resulting diff, and commit the resolution. Never discard another contributor's change merely to make a merge succeed. Integrate parallel work before running shared checks centrally.
 
-5. Run the shared gates below and exercise the changed UI/API path where applicable. Push your branch, for example `git push -u origin feature/shared-date-window`, then open a PR **to `main`** with acceptance/evidence links, scope/limitations, migration/config impacts, and a safe deployment/rollback note.
+5. Run the shared gates below and exercise the changed UI/API path where applicable. Authorized writers push their branch, for example `git push -u origin feature/shared-date-window`, then open a PR **to `main`** with acceptance/evidence links, scope/limitations, migration/config impacts, and a safe deployment/rollback note. Contributors without write permission push to their own fork and propose a PR to this repository's `main`; keep `origin` pointing to the canonical repository for the fetch/merge workflow above and use a separately named fork remote for pushes.
 6. Self-review the final diff and resolve all PR conversations. No non-author approval is required; GitHub does not let authors approve their own PR, and a self-review does not require an approval event. Optional teammate review and independent course evidence do not create an approval gate.
 7. Immediately before merging, confirm that the PR includes current `main`, has no conflicts, and the `CI` workflow's **`Quality gate`** check succeeded for the latest PR commit and current integration with `main`. If either branch changes, synchronize as needed and wait for a fresh successful run; an old green run is insufficient. Do not merge failed, skipped, cancelled, or pending gates.
-8. The author may **squash-merge** the PR, then delete the merged branch. Use squash only; do not use merge-commit or rebase merging. Source publication is not deployment or permission to submit to Canvas.
+8. An author with repository write permission may **squash-merge** their own PR, then delete the merged branch. Otherwise an authorized writer merges it after the same gates. Use squash only; do not use merge-commit or rebase merging. Source publication is not deployment or permission to submit to Canvas.
 
 ### Enforcement status
 
-These are mandatory team rules, **not server-enforced branch protection**. On 2026-10-08, GitHub's protection API returned HTTP 403: `Upgrade to GitHub Pro or make this repository public to enable this feature.` Keep the repository private; do not change visibility to bypass this limitation. CI reports results but cannot prevent direct pushes or an author merging without satisfying policy. If a supported private-repository plan becomes available, configure PR-only, up-to-date/conflict-free merges, resolved conversations, and required check `Quality gate` with **zero required approvals**.
+On 2026-10-08, the owner explicitly authorized public visibility and GitHub accepted classic branch protection for `main`. Protection requires a PR, the **`Quality gate`** status check from GitHub Actions (app ID `15368`), strict up-to-date branches, resolved conversations, and linear history. Enforcement includes administrators; force pushes and deletion of `main` are disabled. Required approvals are **zero**, with neither code-owner approval nor last-push approval required. Authors with write permission may self-review and self-merge once these gates pass; public visibility does not grant write or merge permission.
 
-GitHub repository settings are configured for squash-only merging, automatic deletion of merged branches, and the update-branch option; merge-commit and rebase merging are disabled. Actions is enabled. These settings do not make PR use, successful CI, or up-to-date branches mandatory at the server: both branch-protection and ruleset APIs returned the 403 limitation above. No paid upgrade or public publication is authorized.
+GitHub repository settings are configured for squash-only merging, automatic deletion of merged branches, and the update-branch option; merge-commit and rebase merging are disabled. Actions is enabled. These settings complement the enforced `main` protection. Public source publication is authorized; a paid upgrade, app deployment, access to private user data, and real-account testing are not authorized by that decision.
 
 ### Shared quality gates
 
@@ -233,7 +233,7 @@ A planned document is not a completed deliverable. Keep requirement → implemen
 
 Use the [handoff template](docs/templates/agent-task.md) for an issue/PR or an agent prompt. A handoff must state the role, target, acceptance, allowed files, environment, observed checks, blockers, and next action. Do not paste an entire private session history.
 
-- Public-to-the-team task/review evidence belongs in sanitized issues, PRs, or normal tracked docs. Machine-specific session notes belong in ignored `.handoff/`; never commit handoff notes, `NEXT_SESSION*`, credentials, private feed URLs, user content, browser profiles, or local logs.
+- Sanitized task/review evidence belongs in public issues, PRs, or normal tracked docs. Machine-specific session notes belong in ignored `.handoff/`; never commit handoff notes, `NEXT_SESSION*`, credentials, private feed URLs, user content, browser profiles, or local logs.
 - Do not use the owner's personal account for development/QA or record personal names, email addresses, or machine-specific usernames/paths in shared evidence. CI and the local smoke harness use synthetic provider accounts. Real-provider acceptance requires a separately authorized designated test account.
 - Before committing, set repository-local Git authorship to your chosen GitHub username and your own GitHub-provided noreply email; do not inherit a personal email from global Git configuration. These settings affect future commits only. Removing an identifier from a new commit does not remove historical copies, PR references, or existing clones; historical cleanup requires an explicitly coordinated plan.
 - Do not enable paid AI/SMS, scrape authenticated provider pages, create provider tokens, send notifications, write external calendars, or deploy without the specific required authorization.
@@ -242,18 +242,19 @@ Use the [handoff template](docs/templates/agent-task.md) for an issue/PR or an a
 
 ## 7. Troubleshooting
 
-| Symptom                                  | Check / action                                                                                                     |
-| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| Repository clone denied                  | Accept the private-repository invitation and authenticate GitHub; never share a token in chat                      |
-| Port already in use                      | Identify its owner; preserve 3000/5173/55432 and do not kill unrelated processes                                   |
-| Database connection refused              | Check Docker and `pg_isready`; verify loopback port and database name                                              |
-| API health works but app does not        | Health alone is not DB/auth readiness; use the complete synthetic setup or approved provider configuration         |
-| UI reports missing API configuration     | Export `VITE_API_URL` before starting/building Vite; root `.env` is not the Vite environment                       |
-| Synthetic sign-in rejected by the button | Use the explicit loopback bootstrap above in an isolated profile; do not relax production URL checks               |
-| Origin/CSRF errors                       | Use exactly `127.0.0.1:5174`, not `localhost`; preserve credentials and bootstrap CSRF; do not disable protections |
-| No extracted proposals                   | Default extraction is disabled; choose explicit synthetic mode for harness work, not paid API activation           |
-| Database tests skipped                   | Supply the disposable `action_inbox_test` URL and report the actual run                                            |
-| Canvas assignment lacks completion state | Calendar feed limitation; do not infer completion or claim Canvas write-back                                       |
+| Symptom                                  | Check / action                                                                                                                                                 |
+| ---------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Repository clone denied                  | Use the canonical public HTTPS URL above; no invitation is needed. Check network/proxy or stale credential configuration; never share a token in chat          |
+| Branch push or PR merge denied           | Authenticate with an account granted repository write permission, or push to your own fork and propose a PR. Writers must still satisfy protected `main` gates |
+| Port already in use                      | Identify its owner; preserve 3000/5173/55432 and do not kill unrelated processes                                                                               |
+| Database connection refused              | Check Docker and `pg_isready`; verify loopback port and database name                                                                                          |
+| API health works but app does not        | Health alone is not DB/auth readiness; use the complete synthetic setup or approved provider configuration                                                     |
+| UI reports missing API configuration     | Export `VITE_API_URL` before starting/building Vite; root `.env` is not the Vite environment                                                                   |
+| Synthetic sign-in rejected by the button | Use the explicit loopback bootstrap above in an isolated profile; do not relax production URL checks                                                           |
+| Origin/CSRF errors                       | Use exactly `127.0.0.1:5174`, not `localhost`; preserve credentials and bootstrap CSRF; do not disable protections                                             |
+| No extracted proposals                   | Default extraction is disabled; choose explicit synthetic mode for harness work, not paid API activation                                                       |
+| Database tests skipped                   | Supply the disposable `action_inbox_test` URL and report the actual run                                                                                        |
+| Canvas assignment lacks completion state | Calendar feed limitation; do not infer completion or claim Canvas write-back                                                                                   |
 
 ## 8. Guide verification record
 
