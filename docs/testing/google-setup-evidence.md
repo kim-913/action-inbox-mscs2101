@@ -23,7 +23,7 @@ Observed in the authenticated Google Cloud console in Arc on 2026-10-07. This is
 
 ## Consent and declared scopes
 
-- Audience page explicitly showed **External**, publishing status **Testing**, and **1 test user**: `kziruo@gmail.com`.
+- Audience page explicitly showed **External**, publishing status **Testing**, and **1 test user**. The personal account identifier is intentionally omitted; this historical observation does not authorize using a personal account for development or QA.
 - No public publication, verification submission, additional test users, or changes to the existing Desktop client were performed. The other three proposed account addresses remain unknown and unconfigured.
 - Data Access initially had no declared scope rows. Added these five app-required scopes without removing any existing declarations:
   - `openid`
@@ -36,6 +36,6 @@ Observed in the authenticated Google Cloud console in Arc on 2026-10-07. This is
 
 ## User handoff and boundaries
 
-Developer setup is complete; there is no outstanding Cloud-console interaction required from the user. Open <http://127.0.0.1:5173/> in Arc and use the app's Google Connect action with the approved test account. Only the user should complete Google's sign-in/consent; ordinary app users do not configure Google Cloud.
+This records historical Cloud-console setup, not current permission to use any personal test account. Development and CI must use the synthetic providers documented in `CONTRIBUTING.md`; do not use the owner's personal account for testing. A separately authorized real-provider acceptance run requires a designated test account and private configuration. Only the account holder should complete Google's sign-in/consent; ordinary app users do not configure Google Cloud. Removing identifiers from this document does not remove an account from Google Cloud, revoke consent, or change a running application's allowlist.
 
 No Google authorization consent was accepted on the user's behalf, no tokens were exchanged by this setup worker, no real Gmail data was read, and no Calendar events were created. No Canvas/Drive/Docs browser automation was performed. Live login and user-approved application operations remain separate from this setup evidence. Local service startup and browser/API smoke evidence belong to the API owner, not this document.
