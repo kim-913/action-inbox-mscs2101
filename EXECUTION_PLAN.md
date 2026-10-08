@@ -7,7 +7,7 @@ Target: browser-first course MVP and live demonstration on December 5, 2026
 
 ## 1. Operating constraints
 
-- Authoritative source and sanitized technical documentation are maintained in the private repository `kim-913/mscs2101`; local work remains in `/Users/ziruoke/Project/mscs2101`, with course artifacts also maintained in the team's dedicated Google Drive folder.
+- Authoritative source and sanitized technical documentation are maintained in the private repository `kim-913/action-inbox-mscs2101`; local work uses the contributor's own checkout, with course artifacts also maintained in the team's dedicated Google Drive folder.
 - Do not create, publish, or connect a public GitHub repository until the team explicitly decides to do so.
 - Do not submit, post, message, or modify anything in Canvas without the user’s explicit confirmation for that specific action.
 - Do not use browser UI automation for Canvas, Google Drive, or Google Docs. Use the authenticated local Google Workspace MCP integration; any unavoidable interactive sign-in must use the user's default Arc browser.
@@ -352,7 +352,7 @@ Required course/evaluation cross-review (separate from GitHub merge approvals):
 
 ## 12. Engineering workflow
 
-The owner approved private GitHub publication on 2026-10-08. The repository is [kim-913/mscs2101](https://github.com/kim-913/mscs2101); the earlier local-only/no-remote restriction is superseded. See [CONTRIBUTING.md](CONTRIBUTING.md) for current setup and review procedures, [AGENTS.md](AGENTS.md) for the agent entry point, and the linked role Skills for role-specific execution.
+The owner approved private GitHub publication on 2026-10-08. The repository is [kim-913/action-inbox-mscs2101](https://github.com/kim-913/action-inbox-mscs2101); the earlier local-only/no-remote restriction is superseded. See [CONTRIBUTING.md](CONTRIBUTING.md) for current setup and review procedures, [AGENTS.md](AGENTS.md) for the agent entry point, and the linked role Skills for role-specific execution.
 
 1. Keep the authoritative source and sanitized technical documentation in the private repository.
 2. Use short-lived `feature/*`, `fix/*`, `docs/*`, or `chore/*` branches and one coherent PR to `main`; stage only owned files. Coordinate overlapping work and one integration owner. Never directly push or force-push `main`, or rewrite shared branches; synchronize with `git fetch origin` and `git merge origin/main`, resolving conflicts with affected owners.

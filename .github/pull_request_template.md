@@ -21,4 +21,4 @@
 - [ ] Relevant review conversations are resolved. No approval is required; I may squash-merge my own PR after completing these checks.
 - [ ] Any separate course-artifact review or unresolved acceptance gate is recorded rather than silently waived.
 
-Use squash merge and delete the merged branch. GitHub does not allow self-approval; author self-review is not an approval event. The current private-repository plan does not support branch protection/rulesets, so these are mandatory team rules, not server-enforced merge gates. See [CONTRIBUTING.md](https://github.com/kim-913/mscs2101/blob/main/CONTRIBUTING.md) for the canonical policy.
+Use squash merge and delete the merged branch. GitHub does not allow self-approval; author self-review is not an approval event. The current private-repository plan does not support branch protection/rulesets, so these are mandatory team rules, not server-enforced merge gates. See [CONTRIBUTING.md](https://github.com/kim-913/action-inbox-mscs2101/blob/main/CONTRIBUTING.md) for the canonical policy.

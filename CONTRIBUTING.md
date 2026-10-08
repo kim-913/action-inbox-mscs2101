@@ -1,6 +1,6 @@
 # Contributor guide
 
-Start here to work on Action Inbox as a teammate or coding agent. The repository is private: [kim-913/mscs2101](https://github.com/kim-913/mscs2101). Repository access does **not** grant Google test-user access, Canvas access, permission to spend money, or permission to deploy.
+Start here to work on Action Inbox as a teammate or coding agent. The repository is private: [kim-913/action-inbox-mscs2101](https://github.com/kim-913/action-inbox-mscs2101). Repository access does **not** grant Google test-user access, Canvas access, permission to spend money, or permission to deploy.
 
 ## 1. Pick your role
 
@@ -45,8 +45,8 @@ Use Node.js **22.12+**, npm **11+**, Git, and a current browser. Docker with Pos
 Accept the repository invitation first, then:
 
 ```bash
-git clone https://github.com/kim-913/mscs2101.git
-cd mscs2101
+git clone https://github.com/kim-913/action-inbox-mscs2101.git
+cd action-inbox-mscs2101
 npm ci
 ```
 
@@ -234,6 +234,8 @@ A planned document is not a completed deliverable. Keep requirement → implemen
 Use the [handoff template](docs/templates/agent-task.md) for an issue/PR or an agent prompt. A handoff must state the role, target, acceptance, allowed files, environment, observed checks, blockers, and next action. Do not paste an entire private session history.
 
 - Public-to-the-team task/review evidence belongs in sanitized issues, PRs, or normal tracked docs. Machine-specific session notes belong in ignored `.handoff/`; never commit handoff notes, `NEXT_SESSION*`, credentials, private feed URLs, user content, browser profiles, or local logs.
+- Do not use the owner's personal account for development/QA or record personal names, email addresses, or machine-specific usernames/paths in shared evidence. CI and the local smoke harness use synthetic provider accounts. Real-provider acceptance requires a separately authorized designated test account.
+- Before committing, set repository-local Git authorship to your chosen GitHub username and your own GitHub-provided noreply email; do not inherit a personal email from global Git configuration. These settings affect future commits only. Removing an identifier from a new commit does not remove historical copies, PR references, or existing clones; historical cleanup requires an explicitly coordinated plan.
 - Do not enable paid AI/SMS, scrape authenticated provider pages, create provider tokens, send notifications, write external calendars, or deploy without the specific required authorization.
 - Preserve last-success data and truthful error states. Never claim skipped checks, synthetic providers, metadata-only reminders, or user-reported success as stronger evidence than they are.
 - Stop your own development commands with Ctrl-C. You may stop your disposable container with `docker stop action-inbox-contributor-db` and later restart it with `docker start action-inbox-contributor-db`. Do not delete storage automatically; a clean-reset decision applies only to the explicitly identified disposable environment.
