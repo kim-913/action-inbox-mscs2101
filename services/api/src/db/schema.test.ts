@@ -16,6 +16,38 @@ describe.skipIf(!connectionString)("PostgreSQL identity constraints", () => {
     await pool.end();
   });
 
+  it("defaults display days and rejects values outside the persistent user boundary", async () => {
+    const userId = randomUUID();
+    await pool.query(
+      "INSERT INTO users(id,email,display_name) VALUES ($1,$2,'Display test')",
+      [userId, `${userId}@example.test`],
+    );
+    try {
+      const initial = await pool.query(
+        "SELECT display_window_days FROM users WHERE id=$1",
+        [userId],
+      );
+      expect(initial.rows[0]?.display_window_days).toBe(30);
+      for (const value of [0, -1, 366]) {
+        await expect(
+          pool.query("UPDATE users SET display_window_days=$2 WHERE id=$1", [
+            userId,
+            value,
+          ]),
+        ).rejects.toMatchObject({ code: "23514" });
+      }
+      for (const value of [1, 7, 30, 365]) {
+        const saved = await pool.query(
+          "UPDATE users SET display_window_days=$2 WHERE id=$1 RETURNING display_window_days",
+          [userId, value],
+        );
+        expect(saved.rows[0]?.display_window_days).toBe(value);
+      }
+    } finally {
+      await pool.query("DELETE FROM users WHERE id=$1", [userId]);
+    }
+  });
+
   it("enforces normalized unique email and cascades connection deletion", async () => {
     const userId = randomUUID();
     const email = `${userId}@example.test`;

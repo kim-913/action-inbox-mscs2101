@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { apiErrorSchema, pageQuerySchema } from "./p0.js";
+import { displayRangeShape, validDisplayRange } from "./display.js";
 
 export const canvasDateSchema = z.discriminatedUnion("kind", [
   z.strictObject({
@@ -36,7 +37,11 @@ export const canvasConnectionSchema = z.strictObject({
 export const canvasConnectRequestSchema = z.strictObject({
   feedUrl: z.string().min(1).max(2048),
 });
-export const canvasItemsQuerySchema = pageQuerySchema;
+export const canvasItemsQuerySchema = pageQuerySchema
+  .extend(displayRangeShape)
+  .refine(validDisplayRange, {
+    message: "Provide all four ordered display bounds",
+  });
 export const canvasItemsResponseSchema = z.strictObject({
   items: z.array(canvasItemSchema),
   nextCursor: z.string().nullable(),

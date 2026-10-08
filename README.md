@@ -24,7 +24,13 @@ The user approved incremental Outlook and Canvas connectors, a first-class inter
 
 Notification delivery and any SMS option need separate permission, mechanism, cost approval, and observed end-to-end delivery. No SMS provider, paid account, message send, or fake enabled control is authorized by the roadmap. Existing P0 AC-09 remains an explicit unresolved delivery criterion. See `docs/requirements/phase-2.md`, `docs/testing/connector-prerequisites.md`, and the authoritative `EXECUTION_PLAN.md`.
 
-Next requested feature, not yet implemented: one user-configurable display window shared across all connectors/systems, with 7-day, 30-day, and custom day-count choices. Repository setup comes first; the date-window feature remains deferred. Its date direction and source-specific date semantics must be resolved before implementation; this request does not authorize deleting older stored data.
+### Shared display window and source views
+
+Use **Display window** at the top of the signed-in workspace: choose **7 days**, **30 days**, or **Custom** (1–365), then **Apply display window**. The account-owned setting survives reload and new sessions. Gmail lists show messages received in the last N local calendar days, including today; tasks, Canvas and Calendar show due dates or overlapping events from today through the next N−1 days. Each surface states its exact dates and browser timezone. Undated work is separately labelled, not counted as dated matches.
+
+Planner source controls separate **All**, **Gmail**, **Canvas**, **Google Calendar**, and **Manual tasks**. Gmail remains readable without AI extraction. An upcoming proposal or approved task can still link to an older source email; receipt time is not its deadline. Tasks also have their own source selector. Source selection resets when the signed-in workspace is replaced; the saved day count does not.
+
+This filters displayed data, not retention or ingestion. Gmail imports remain bounded to the latest 14 days and 100 messages; selecting 30 days does not backfill older mail. Canvas remains its limited imported feed, and Calendar remains a provider-bounded snapshot of at most 100 events. Matching pages must be loaded explicitly. Failed preference saves retain the previous active window, and changing a task's date outside the window does not remove access to its selected detail.
 
 ### Canvas calendar-only connection
 

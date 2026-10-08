@@ -94,7 +94,7 @@ export function deterministicEventId(userId: string, taskId: string): string {
 
 export function parseUpcoming(input: unknown): CalendarEvent[] {
   const parsed = z
-    .object({ items: z.array(eventSchema).default([]) })
+    .object({ items: z.array(eventSchema).max(100).default([]) })
     .safeParse(input);
   if (!parsed.success) throw safeGoogleFailure(null);
   const items: CalendarEvent[] = [];

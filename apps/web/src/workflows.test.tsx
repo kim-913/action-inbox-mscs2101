@@ -530,6 +530,8 @@ describe("P0 browser interactions", () => {
               }
             : session,
         );
+      if (path === "/v1/preferences/display")
+        return Response.json({ windowDays: 30 });
       if (path === "/v1/inbox")
         return Response.json({
           items: [],
@@ -565,13 +567,24 @@ describe("P0 browser interactions", () => {
       <Application api={new ApiClient("http://localhost:3000", fetcher)} />,
     );
     await screen.findByText("Signed in as Test User");
+    const sourceControls = await screen.findByRole("group", {
+      name: "Planner sources",
+    });
+    fireEvent.click(
+      within(sourceControls).getByRole("button", { name: "Gmail" }),
+    );
+    expect(
+      within(sourceControls)
+        .getByRole("button", { name: "Gmail" })
+        .getAttribute("aria-pressed"),
+    ).toBe("true");
     cache.setQueryData(["private", "secret"], { body: "private data" });
     fireEvent.click(
       within(
         screen.getByRole("navigation", { name: "Main navigation" }),
       ).getByRole("button", { name: "Connections" }),
     );
-    fireEvent.click(screen.getByRole("button", { name: "Log out" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Log out" }));
     expect(
       fetcher.mock.calls.some((call) => String(call[0]).endsWith("/logout")),
     ).toBe(false);
@@ -583,5 +596,30 @@ describe("P0 browser interactions", () => {
       name: "Turn email into a next step you approve.",
     });
     expect(screen.queryByText("Signed in as Test User")).toBeNull();
+    expect(screen.queryByRole("group", { name: "Planner sources" })).toBeNull();
+    expect(
+      screen.queryByRole("heading", { name: "Display window" }),
+    ).toBeNull();
+    loggedOut = false;
+    await cache.invalidateQueries({ queryKey: ["session"] });
+    await screen.findByText("Signed in as Test User");
+    fireEvent.click(
+      within(
+        screen.getByRole("navigation", { name: "Main navigation" }),
+      ).getByRole("button", { name: "Planner" }),
+    );
+    const restoredSources = await screen.findByRole("group", {
+      name: "Planner sources",
+    });
+    expect(
+      within(restoredSources)
+        .getByRole("button", { name: "All" })
+        .getAttribute("aria-pressed"),
+    ).toBe("true");
+    expect(
+      within(restoredSources)
+        .getByRole("button", { name: "Gmail" })
+        .getAttribute("aria-pressed"),
+    ).toBe("false");
   });
 });

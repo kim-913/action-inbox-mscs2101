@@ -22,21 +22,22 @@ Read [README](README.md) for product status and [EXECUTION_PLAN](EXECUTION_PLAN.
 - Working boundaries include Google login/Gmail import, an internal planner, app-owned tasks, and read-only Sofia Canvas calendar subscriptions.
 - Canvas is **not** full Canvas OAuth, grade/submission access, or reliable assignment completion tracking. Feed disappearance does not mean completion.
 - Reminder metadata is **not** delivered notifications. Paid extraction is disabled by default.
-- Outlook/full Canvas OAuth and the requested shared 7-day / 30-day / custom display window are not implemented.
+- A shared account-persisted 7-day / 30-day / custom (1–365) display window and Planner source filters are implemented; see [README](README.md#shared-display-window-and-source-views). Outlook/full Canvas OAuth remain unimplemented.
 - Historical test results are evidence for their recorded revision, not proof that your branch passes today.
 
-| Work area                                       | Source of truth                                                                                  |
-| ----------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| React UI, planner, date display, API client     | `apps/web/src/`                                                                                  |
-| API lifecycle/configuration                     | `services/api/src/server.ts`, `app.ts`, `config.ts`                                              |
-| Google identity and sessions                    | `services/api/src/auth/`                                                                         |
-| Gmail import and extraction                     | `services/api/src/pipeline/`                                                                     |
-| Canvas feed parsing, transport, persistence     | `services/api/src/canvas/`                                                                       |
-| Tasks, Calendar, reminders, account deletion    | `services/api/src/domain/`                                                                       |
-| Shared runtime schemas                          | `packages/contracts/src/`                                                                        |
-| Database schema and checksum-tracked migrations | `services/api/src/db/`, `database/migrations/`                                                   |
-| API and deployment contracts                    | [API contract](docs/architecture/api-contract.md), [deployment](docs/architecture/deployment.md) |
-| Sanitized fixtures and recorded evidence        | `test-data/`, `docs/testing/`                                                                    |
+| Work area                                       | Source of truth                                                                                                                                           |
+| ----------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| React UI, planner, date display, API client     | `apps/web/src/`                                                                                                                                           |
+| API lifecycle/configuration                     | `services/api/src/server.ts`, `app.ts`, `config.ts`                                                                                                       |
+| Google identity and sessions                    | `services/api/src/auth/`                                                                                                                                  |
+| Gmail import and extraction                     | `services/api/src/pipeline/`                                                                                                                              |
+| Canvas feed parsing, transport, persistence     | `services/api/src/canvas/`                                                                                                                                |
+| Tasks, Calendar, reminders, account deletion    | `services/api/src/domain/`                                                                                                                                |
+| Shared display preferences and range filtering  | `packages/contracts/src/display.ts`, `services/api/src/domain/display.ts`, `services/api/src/domain/display-window.ts`, `apps/web/src/display-window.tsx` |
+| Shared runtime schemas                          | `packages/contracts/src/`                                                                                                                                 |
+| Database schema and checksum-tracked migrations | `services/api/src/db/`, `database/migrations/`                                                                                                            |
+| API and deployment contracts                    | [API contract](docs/architecture/api-contract.md), [deployment](docs/architecture/deployment.md)                                                          |
+| Sanitized fixtures and recorded evidence        | `test-data/`, `docs/testing/`                                                                                                                             |
 
 ## 3. Local setup: choose a mode
 
@@ -129,7 +130,7 @@ curl -fsS -X POST http://127.0.0.1:3002/__smoke/canvas-mode \
   -H 'Content-Type: application/json' -d '{"mode":"changed"}'
 ```
 
-Choose `original`, `changed`, or `unavailable`, then click Canvas Refresh. These routes do not exist in production. Fixture dates are fixed; navigate the planner to their dates rather than assuming they are due today.
+Choose `original`, `changed`, or `unavailable`, then click Canvas Refresh. These routes do not exist in production. Fixture dates are fixed: choose a display window that includes them before navigating the planner. A range with no matching fixture dates is correctly empty. The setting changes display, not the provider import window.
 
 Restarting the harness generates a new encryption key. Use disposable fixture data only; clear this isolated browser profile and recreate your disposable environment if you need a clean session. Never copy real tokens into this database.
 

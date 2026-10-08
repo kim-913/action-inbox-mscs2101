@@ -41,7 +41,7 @@ export function buildApp(
   void app.register(cors, {
     origin: webOrigin,
     credentials: true,
-    methods: ["GET", "POST", "PATCH", "DELETE"],
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
     allowedHeaders: ["Content-Type", "X-CSRF-Token"],
   });
 

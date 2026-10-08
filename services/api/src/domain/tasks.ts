@@ -11,6 +11,7 @@ import {
   decodeCursor,
   encodeCursor,
   lockTask,
+  missing,
   parse,
   resourceId,
   serializeTask,
@@ -18,6 +19,7 @@ import {
   transaction,
   type TaskRow,
 } from "./store.js";
+import { filterKey } from "./display-window.js";
 
 export function registerTasks(app: FastifyInstance, runtime: Runtime): void {
   app.get(
@@ -25,8 +27,9 @@ export function registerTasks(app: FastifyInstance, runtime: Runtime): void {
     { preHandler: runtime.requireUser },
     async (request) => {
       const query = parse(tasksQuerySchema, request.query);
-      const cursor = decodeCursor(query.cursor);
       const userId = authenticatedUser(request);
+      const filter = filterKey(userId, query);
+      const cursor = decodeCursor(query.cursor, filter);
       return transaction(runtime, userId, async (client) => {
         const result = await client.query<
           TaskRow & { cursor_created_at: string }
@@ -34,6 +37,8 @@ export function registerTasks(app: FastifyInstance, runtime: Runtime): void {
           `SELECT *,to_char(created_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_created_at
          FROM tasks WHERE user_id=$1 AND ($2::text IS NULL OR status=$2)
          AND ($3::timestamptz IS NULL OR (created_at,id)<($3::timestamptz,$4::uuid))
+         AND ($6::timestamptz IS NULL OR (due_at >= $6::timestamptz AND due_at < $7::timestamptz) OR ($8::boolean AND due_at IS NULL))
+         AND ($9::text IS NULL OR ($9='gmail' AND source_email_id IS NOT NULL) OR ($9='manual' AND source_email_id IS NULL))
          ORDER BY created_at DESC,id DESC LIMIT $5`,
           [
             userId,
@@ -41,6 +46,10 @@ export function registerTasks(app: FastifyInstance, runtime: Runtime): void {
             cursor?.createdAt ?? null,
             cursor?.id ?? null,
             query.limit + 1,
+            query.startAt ?? null,
+            query.endAt ?? null,
+            query.includeUndated === "true",
+            query.source ?? null,
           ],
         );
         const page = result.rows.slice(0, query.limit);
@@ -48,9 +57,27 @@ export function registerTasks(app: FastifyInstance, runtime: Runtime): void {
           items: await serializeTasks(client, page),
           nextCursor:
             result.rows.length > query.limit
-              ? encodeCursor(page[page.length - 1]!)
+              ? encodeCursor(page[page.length - 1]!, filter)
               : null,
         };
+      });
+    },
+  );
+
+  app.get(
+    apiRoutes.task,
+    { preHandler: runtime.requireUser },
+    async (request) => {
+      const id = resourceId(request.params);
+      const userId = authenticatedUser(request);
+      return transaction(runtime, userId, async (client) => {
+        const result = await client.query<TaskRow>(
+          "SELECT * FROM tasks WHERE user_id=$1 AND id=$2",
+          [userId, id],
+        );
+        const row = result.rows[0];
+        if (!row) return missing();
+        return serializeTask(client, row);
       });
     },
   );

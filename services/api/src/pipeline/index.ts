@@ -21,6 +21,7 @@ import {
   type SyncRow,
 } from "./store.js";
 import { finishFailedRun, processSync, type SyncJob } from "./worker.js";
+import { filterKey } from "../domain/display-window.js";
 
 const QUEUE = "gmail-sync-v1";
 const DEAD_QUEUE = "gmail-sync-failed-v1";
@@ -28,6 +29,7 @@ const idParams = z.strictObject({ id: z.uuid() });
 const cursorSchema = z.strictObject({
   receivedAt: z.iso.datetime(),
   id: z.uuid(),
+  filter: z.string().length(64),
 });
 interface InboxRow extends EmailRow {
   received_cursor: string;
@@ -150,12 +152,14 @@ export async function registerPipeline(
   app.get(apiRoutes.inbox, options, async (request) => {
     const userId = authenticatedUser(request);
     const query = inboxQuerySchema.parse(request.query);
+    const filter = filterKey(userId, query);
     let cursor: z.infer<typeof cursorSchema> | null = null;
     if (query.cursor) {
       try {
         cursor = cursorSchema.parse(
           JSON.parse(Buffer.from(query.cursor, "base64url").toString("utf8")),
         );
+        if (cursor.filter !== filter) throw new Error("Changed filters");
       } catch {
         throw new ApiFailure(
           400,
@@ -169,7 +173,15 @@ export async function registerPipeline(
       to_char(e.received_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS received_cursor
       FROM email_messages e WHERE e.user_id=$1
       AND ($2::text IS NULL OR e.category=$2)
-      AND ($3::text IS NULL OR EXISTS(SELECT 1 FROM suggestions s WHERE s.email_id=e.id AND s.user_id=$1 AND s.review_state=$3))
+      AND (
+        ($7::text='received' AND ($8::timestamptz IS NULL OR (e.received_at >= $8::timestamptz AND e.received_at < $9::timestamptz))
+          AND ($3::text IS NULL OR EXISTS(SELECT 1 FROM suggestions s WHERE s.email_id=e.id AND s.user_id=$1 AND s.review_state=$3)))
+        OR ($7::text='suggestionDue' AND EXISTS(
+          SELECT 1 FROM suggestions s WHERE s.email_id=e.id AND s.user_id=$1
+          AND ($3::text IS NULL OR s.review_state=$3)
+          AND ($8::timestamptz IS NULL OR (s.due_at >= $8::timestamptz AND s.due_at < $9::timestamptz) OR ($10::boolean AND s.due_at IS NULL))
+        ))
+      )
       AND ($4::timestamptz IS NULL OR (e.received_at,e.id)<($4::timestamptz,$5::uuid))
       ORDER BY e.received_at DESC,e.id DESC LIMIT $6`,
       [
@@ -179,6 +191,10 @@ export async function registerPipeline(
         cursor?.receivedAt ?? null,
         cursor?.id ?? null,
         query.limit + 1,
+        query.dateField,
+        query.startAt ?? null,
+        query.endAt ?? null,
+        query.includeUndated === "true",
       ],
     );
     const page = messages.rows.slice(0, query.limit);
@@ -211,7 +227,11 @@ export async function registerPipeline(
       nextCursor:
         messages.rows.length > query.limit && last
           ? Buffer.from(
-              JSON.stringify({ receivedAt: last.received_cursor, id: last.id }),
+              JSON.stringify({
+                receivedAt: last.received_cursor,
+                id: last.id,
+                filter,
+              }),
             ).toString("base64url")
           : null,
       dataState: {

@@ -23,6 +23,12 @@ import {
 import { ErrorNotice, displayDate, useNow } from "./ui";
 import { dueUrgency } from "./urgency";
 import {
+  DisplayRange,
+  useDisplayWindow,
+  windowQuery,
+  withinWindow,
+} from "./display-window";
+import {
   CanvasSourceDetails,
   canvasError,
   canvasConnectionLabel,
@@ -32,8 +38,10 @@ import {
   plannerDates,
   plannerDay,
   plannerItems,
+  plannerOccursOnDay,
   plannerSortTime,
   type PlannerItem,
+  type PlannerSource,
 } from "./planner-model";
 
 export function Planner({
@@ -53,40 +61,66 @@ export function Planner({
 }) {
   const cache = useQueryClient();
   const now = useNow();
+  const { ready, recent, upcoming, identity } = useDisplayWindow();
+  const [source, setSource] = useState<PlannerSource>("all");
+  const showGmail = source === "all" || source === "gmail";
+  const showTasks = showGmail || source === "manual";
+  const showCalendar = source === "all" || source === "calendar";
+  const showCanvas = source === "all" || source === "canvas";
+  const today = upcoming.startDate;
+  const todayDate = new Date(`${today}T12:00:00`);
   const [weekOffset, setWeekOffset] = useState(0);
-  const [selectedDay, setSelectedDay] = useState(() =>
-    plannerDay(new Date().toISOString())!,
-  );
+  const [selectedDay, setSelectedDay] = useState(today);
   const [watch, setWatch] = useState(0);
+  useEffect(() => {
+    setWeekOffset(0);
+    setSelectedDay(today);
+  }, [identity, today]);
   const mail = useInfiniteQuery({
-    queryKey: ["private", "inbox"],
+    queryKey: ["private", "inbox", "recent", recent, source],
+    enabled: ready && showGmail,
     initialPageParam: null as string | null,
     queryFn: ({ pageParam, signal }) =>
       api.request(
-        `${apiRoutes.inbox}?limit=100${pageParam ? `&cursor=${encodeURIComponent(pageParam)}` : ""}`,
+        `${apiRoutes.inbox}?limit=100&dateField=received&${windowQuery(recent)}${pageParam ? `&cursor=${encodeURIComponent(pageParam)}` : ""}`,
+        inboxResponseSchema,
+        { signal },
+      ),
+    getNextPageParam: (page) => page.nextCursor ?? undefined,
+  });
+  const proposals = useInfiniteQuery({
+    queryKey: ["private", "inbox", "proposals", upcoming, source],
+    enabled: ready && showGmail,
+    initialPageParam: null as string | null,
+    queryFn: ({ pageParam, signal }) =>
+      api.request(
+        `${apiRoutes.inbox}?limit=100&dateField=suggestionDue&reviewState=Proposed&includeUndated=true&${windowQuery(upcoming)}${pageParam ? `&cursor=${encodeURIComponent(pageParam)}` : ""}`,
         inboxResponseSchema,
         { signal },
       ),
     getNextPageParam: (page) => page.nextCursor ?? undefined,
   });
   const tasks = useInfiniteQuery({
-    queryKey: ["private", "tasks"],
+    queryKey: ["private", "tasks", upcoming, source],
+    enabled: ready && showTasks,
     initialPageParam: null as string | null,
     queryFn: ({ pageParam, signal }) =>
       api.request(
-        `${apiRoutes.tasks}?limit=100${pageParam ? `&cursor=${encodeURIComponent(pageParam)}` : ""}`,
+        `${apiRoutes.tasks}?limit=100&includeUndated=true&${windowQuery(upcoming)}${source === "gmail" || source === "manual" ? `&source=${source}` : ""}${pageParam ? `&cursor=${encodeURIComponent(pageParam)}` : ""}`,
         tasksResponseSchema,
         { signal },
       ),
     getNextPageParam: (page) => page.nextCursor ?? undefined,
   });
   const calendar = useQuery({
-    queryKey: ["private", "calendar"],
-    enabled: connected,
+    queryKey: ["private", "calendar", upcoming, source],
+    enabled: ready && connected && showCalendar,
     queryFn: ({ signal }) =>
-      api.request(apiRoutes.upcoming, upcomingCalendarResponseSchema, {
-        signal,
-      }),
+      api.request(
+        `${apiRoutes.upcoming}?${windowQuery(upcoming)}`,
+        upcomingCalendarResponseSchema,
+        { signal },
+      ),
   });
   const canvasConnection = useQuery({
     queryKey: ["private", "canvas", "connection"],
@@ -94,12 +128,12 @@ export function Planner({
       api.request(canvasRoutes.connection, canvasConnectionSchema, { signal }),
   });
   const canvas = useInfiniteQuery({
-    queryKey: ["private", "canvas", "items"],
-    enabled: canvasConnection.data?.connected === true,
+    queryKey: ["private", "canvas", "items", upcoming, source],
+    enabled: ready && showCanvas && canvasConnection.data?.connected === true,
     initialPageParam: null as string | null,
     queryFn: ({ pageParam, signal }) =>
       api.request(
-        `${canvasRoutes.items}?limit=100${pageParam ? `&cursor=${encodeURIComponent(pageParam)}` : ""}`,
+        `${canvasRoutes.items}?limit=100&${windowQuery(upcoming)}${pageParam ? `&cursor=${encodeURIComponent(pageParam)}` : ""}`,
         canvasItemsResponseSchema,
         { signal },
       ),
@@ -140,22 +174,36 @@ export function Planner({
     cache,
   ]);
   const emails = mail.data?.pages.flatMap((page) => page.items) ?? [];
-  const savedTasks = tasks.data?.pages.flatMap((page) => page.items) ?? [];
+  const proposalEmails =
+    proposals.data?.pages
+      .flatMap((page) => page.items)
+      .map((email) => ({
+        ...email,
+        suggestions: email.suggestions.filter(
+          (suggestion) =>
+            suggestion.dueAt === null ||
+            withinWindow(suggestion.dueAt, upcoming),
+        ),
+      })) ?? [];
+  const savedTasks = (
+    tasks.data?.pages.flatMap((page) => page.items) ?? []
+  ).filter((task) => task.dueAt === null || withinWindow(task.dueAt, upcoming));
   const canvasItems = canvasConnection.data?.connected
     ? (canvas.data?.pages.flatMap((page) => page.items) ?? [])
     : [];
   const entries = plannerItems(
-    emails,
+    proposalEmails,
     savedTasks,
     calendar.data?.items ?? [],
     canvasItems,
+    source,
   );
   const undated = entries.filter(needsDate);
   const reviews = entries.filter((item) => item.kind === "suggestion");
   const weekStart = new Date(
-    now.getFullYear(),
-    now.getMonth(),
-    now.getDate() - ((now.getDay() + 6) % 7) + weekOffset * 7,
+    todayDate.getFullYear(),
+    todayDate.getMonth(),
+    todayDate.getDate() - ((todayDate.getDay() + 6) % 7) + weekOffset * 7,
   );
   const days = Array.from(
     { length: 7 },
@@ -165,9 +213,6 @@ export function Planner({
         weekStart.getMonth(),
         weekStart.getDate() + offset,
       ),
-  );
-  const datesByKey = new Map(
-    entries.map((item) => [item.key, plannerDates(item)]),
   );
   const scheduled = entries
     .filter((item) =>
@@ -180,11 +225,10 @@ export function Planner({
         Math.min(...plannerDates(a).map(plannerSortTime)) -
         Math.min(...plannerDates(b).map(plannerSortTime)),
     );
-  const selectedEntries = scheduled.filter((item) =>
-    datesByKey
-      .get(item.key)
-      ?.some((date) => plannerDay(date.at, date.allDay) === selectedDay),
-  );
+  const selectedEntries =
+    selectedDay >= upcoming.startDate && selectedDay < upcoming.endDate
+      ? scheduled.filter((item) => plannerOccursOnDay(item, selectedDay))
+      : [];
   const overdue = entries.filter(
     (item) =>
       item.kind === "task" &&
@@ -196,19 +240,25 @@ export function Planner({
       (email) => email.extractionError?.code === "PROVIDER_NOT_CONFIGURED",
     );
   const calendarError = calendar.data?.error;
-  const more = mail.hasNextPage || tasks.hasNextPage || canvas.hasNextPage;
+  const more =
+    (showGmail && (mail.hasNextPage || proposals.hasNextPage)) ||
+    (showTasks && tasks.hasNextPage) ||
+    (showCanvas && canvas.hasNextPage);
   const loaded = Boolean(
-    mail.data &&
-    tasks.data &&
-    canvasConnection.data &&
-    (!canvasConnection.data.connected || canvas.data),
+    ready &&
+    (!showGmail || (mail.data && proposals.data)) &&
+    (!showTasks || tasks.data) &&
+    (!showCalendar || !connected || calendar.data) &&
+    (!showCanvas ||
+      (canvasConnection.data &&
+        (!canvasConnection.data.connected || canvas.data))),
   );
   function changeWeek(offset: number) {
     setWeekOffset(offset);
     const start = new Date(
-      now.getFullYear(),
-      now.getMonth(),
-      now.getDate() - ((now.getDay() + 6) % 7) + offset * 7,
+      todayDate.getFullYear(),
+      todayDate.getMonth(),
+      todayDate.getDate() - ((todayDate.getDay() + 6) % 7) + offset * 7,
     );
     setSelectedDay(plannerDay(start.toISOString())!);
   }
@@ -225,19 +275,45 @@ export function Planner({
         <div className="heading-actions">
           <button
             className="secondary"
-            disabled={mail.isFetching || tasks.isFetching}
+            disabled={
+              mail.isFetching || proposals.isFetching || tasks.isFetching
+            }
             onClick={() => {
-              void mail.refetch();
-              void tasks.refetch();
-              if (connected) void calendar.refetch();
+              if (showGmail) {
+                void mail.refetch();
+                void proposals.refetch();
+              }
+              if (showTasks) void tasks.refetch();
+              if (connected && showCalendar) void calendar.refetch();
               void canvasConnection.refetch();
-              if (canvasConnection.data?.connected) void canvas.refetch();
+              if (showCanvas && canvasConnection.data?.connected)
+                void canvas.refetch();
             }}
           >
             Refresh plan
           </button>
           <button onClick={() => openTask()}>+ New task</button>
         </div>
+      </div>
+      <div className="source-tabs" role="group" aria-label="Planner sources">
+        {(
+          [
+            ["all", "All"],
+            ["gmail", "Gmail"],
+            ["canvas", "Canvas"],
+            ["calendar", "Google Calendar"],
+            ["manual", "Manual tasks"],
+          ] as const
+        ).map(([value, label]) => (
+          <button
+            key={value}
+            className="secondary small"
+            aria-pressed={source === value}
+            onClick={() => setSource(value)}
+          >
+            {label}
+          </button>
+        ))}
       </div>
       <div className="planner-status">
         <span
@@ -310,6 +386,7 @@ export function Planner({
         </details>
       )}
       <ErrorNotice error={mail.error} />
+      <ErrorNotice error={proposals.error} />
       <ErrorNotice error={tasks.error} />
       <ErrorNotice error={run.error} />
       <ErrorNotice error={calendar.error} />
@@ -353,21 +430,63 @@ export function Planner({
           <strong>{loaded ? overdue : "—"}</strong> overdue tasks
         </span>
         <span>
-          <strong>{mail.data ? reviews.length : "—"}</strong> need review
+          <strong>{loaded ? reviews.length : "—"}</strong> loaded proposals
+          needing review
         </span>
         <span>
-          <strong>{loaded ? undated.length : "—"}</strong> need a date
+          <strong>{loaded ? undated.length : "—"}</strong> loaded undated items
+          (outside dated counts)
         </span>
         <span>
           <strong>
-            {tasks.data
-              ? savedTasks.filter((task) => task.status === "Waiting for Reply")
-                  .length
+            {loaded
+              ? entries.filter(
+                  (item) =>
+                    item.kind === "task" &&
+                    item.task.status === "Waiting for Reply",
+                ).length
               : "—"}
           </strong>{" "}
           waiting for reply
         </span>
       </div>
+      {showGmail && (
+        <section className="surface" aria-labelledby="recent-mail-heading">
+          <h2 id="recent-mail-heading">Recent Gmail emails</h2>
+          <DisplayRange direction="recent" />
+          <p className="section-note">
+            {emails.length} emails loaded
+            {mail.hasNextPage ? "; more available" : ""}. Receipt dates are not
+            deadlines. Reading email does not require AI.
+          </p>
+          {mail.isPending && <p role="status">Loading recent emails…</p>}
+          {mail.data && emails.length === 0 && (
+            <p>No saved emails in this recent window.</p>
+          )}
+          {emails.map((email) => (
+            <article className="planner-row" key={email.id}>
+              <h3>{email.subject || "Untitled email"}</h3>
+              <p>
+                {email.sender} · Received {displayDate(email.receivedAt)}
+              </p>
+              <button
+                className="text-button"
+                onClick={() => openEmail(email.id)}
+              >
+                Open email & source →
+              </button>
+            </article>
+          ))}
+          <p className="hint">
+            Last successful Gmail import:{" "}
+            {displayDate(
+              mail.data?.pages[0]?.dataState.lastSuccessfulSyncAt ?? null,
+            )}
+            .
+          </p>
+        </section>
+      )}
+      <DisplayRange direction="upcoming" />
       <section
         className="surface week-calendar"
         aria-labelledby="calendar-heading"
@@ -396,7 +515,7 @@ export function Planner({
               className="secondary small"
               onClick={() => {
                 setWeekOffset(0);
-                setSelectedDay(plannerDay(now.toISOString())!);
+                setSelectedDay(today);
               }}
             >
               Today
@@ -431,15 +550,14 @@ export function Planner({
         <div className="week-grid">
           {days.map((day) => {
             const key = plannerDay(day.toISOString())!;
-            const items = scheduled.filter((item) =>
-              datesByKey
-                .get(item.key)
-                ?.some((date) => plannerDay(date.at, date.allDay) === key),
-            );
+            const items =
+              key >= upcoming.startDate && key < upcoming.endDate
+                ? scheduled.filter((item) => plannerOccursOnDay(item, key))
+                : [];
             return (
               <button
                 key={key}
-                className={`week-day ${selectedDay === key ? "selected" : ""} ${plannerDay(now.toISOString()) === key ? "is-today" : ""}`}
+                className={`week-day ${selectedDay === key ? "selected" : ""} ${today === key ? "is-today" : ""}`}
                 aria-pressed={selectedDay === key}
                 aria-label={`${day.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}, ${items.length} loaded items`}
                 onClick={() => setSelectedDay(key)}
@@ -508,8 +626,9 @@ export function Planner({
             <span className="count-label">By actual date</span>
           </div>
           <p className="section-note">
-            Overdue tasks and upcoming dates. Suggested dates remain
-            unconfirmed.
+            Upcoming dates in the saved display window. Suggested dates remain
+            unconfirmed. Events overlapping the window retain their source start
+            time.
           </p>
           {scheduled.length === 0 && loaded && (
             <div className="empty-small">
@@ -524,7 +643,7 @@ export function Planner({
               </button>
             </div>
           )}
-          {scheduled.slice(0, 6).map((item) => (
+          {scheduled.map((item) => (
             <PlannerRow
               key={item.key}
               item={item}
@@ -533,12 +652,6 @@ export function Planner({
               openTask={openTask}
             />
           ))}
-          {scheduled.length > 6 && (
-            <p className="hint">
-              Showing the first 6 dated items. Select a calendar day to see its
-              items, or open Tasks for the complete loaded task list.
-            </p>
-          )}
         </section>
         <section className="surface" aria-labelledby="needs-date-heading">
           <div className="section-heading">
@@ -546,8 +659,8 @@ export function Planner({
             <span className="pill neutral">{undated.length}</span>
           </div>
           <p className="section-note">
-            No date does not mean low importance. Choose a date only when you
-            know it.
+            Undated work is separate from the dated window and its counts.
+            Choose a date only when you know it.
           </p>
           {undated.length === 0 && loaded && (
             <p className="empty-small">
@@ -568,36 +681,33 @@ export function Planner({
       </div>
       <div className="loaded-boundary">
         <p>
-          Showing{" "}
-          {mail.data
-            ? `${emails.length} loaded emails`
-            : "source emails not yet loaded"}
-          ,{" "}
-          {tasks.data
-            ? `${savedTasks.length} loaded tasks`
-            : "tasks not yet loaded"}
-          , and{" "}
-          {calendar.data
-            ? `${calendar.data.items.length} returned upcoming Calendar events`
-            : "Calendar not yet loaded"}
-          .{" "}
+          {scheduled.length} dated planner entries loaded for the selected
+          source; {undated.length} undated entries loaded separately. These are
+          loaded counts, not source-wide totals; total matching counts are not
+          supplied by these APIs.{" "}
           {more
             ? "This is a partial plan; load more sources to include their dates."
-            : "Calendar is the provider’s bounded upcoming snapshot, not your full historical calendar."}{" "}
-          Last Calendar fetch:{" "}
-          {displayDate(calendar.data?.lastSuccessfulFetchAt ?? null)}.
+            : "All returned pages are loaded; Calendar remains a provider-bounded snapshot."}
+          {showCalendar && (
+            <>
+              {" "}
+              Last Calendar fetch:{" "}
+              {displayDate(calendar.data?.lastSuccessfulFetchAt ?? null)}.
+            </>
+          )}
         </p>
         <p>
-          {canvasConnection.data?.connected
-            ? `${canvasItems.length} loaded Canvas entries of ${canvasConnection.data.itemCount} imported. Cancelled entries are excluded from the plan.`
-            : canvasConnection.data
-              ? "No Canvas calendar feed is connected."
-              : "Canvas connection status is not yet available."}{" "}
+          {showCanvas &&
+            (canvasConnection.data?.connected
+              ? `${canvasItems.length} window-matching Canvas entries loaded; ${canvasConnection.data.itemCount} total imported across all dates. Cancelled entries are excluded from the plan.`
+              : canvasConnection.data
+                ? "No Canvas calendar feed is connected."
+                : "Canvas connection status is not yet available.")}{" "}
           Canvas feed coverage does not include all undated work, grades,
           submissions or completion status.
         </p>
         <div className="actions">
-          {mail.hasNextPage && (
+          {showGmail && mail.hasNextPage && (
             <button
               className="secondary small"
               disabled={mail.isFetchingNextPage}
@@ -606,7 +716,16 @@ export function Planner({
               Load more source emails
             </button>
           )}
-          {tasks.hasNextPage && (
+          {showGmail && proposals.hasNextPage && (
+            <button
+              className="secondary small"
+              disabled={proposals.isFetchingNextPage}
+              onClick={() => void proposals.fetchNextPage()}
+            >
+              Load more proposal emails
+            </button>
+          )}
+          {showTasks && tasks.hasNextPage && (
             <button
               className="secondary small"
               disabled={tasks.isFetchingNextPage}
@@ -615,7 +734,7 @@ export function Planner({
               Load more tasks
             </button>
           )}
-          {canvas.hasNextPage && (
+          {showCanvas && canvas.hasNextPage && (
             <button
               className="secondary small"
               disabled={canvas.isFetchingNextPage}
@@ -627,9 +746,9 @@ export function Planner({
         </div>
         <p>
           Urgency uses actual task deadlines in this browser’s timezone.
-          Calendar times are scheduled events, not inferred deadlines. Linked
-          Google events are combined with their task; both dates remain visible.
-          Completed tasks are excluded.
+          Calendar times are scheduled events, not inferred deadlines. In All,
+          linked Google events are combined with their task; the Google Calendar
+          source shows events independently. Completed tasks are excluded.
         </p>
       </div>
     </section>

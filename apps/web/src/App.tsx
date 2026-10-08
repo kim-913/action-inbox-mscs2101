@@ -24,6 +24,7 @@ import { Calendar } from "./Calendar";
 import { Planner } from "./PlannerPage";
 import { CanvasConnectionCard } from "./CanvasFeed";
 import { ActionNotice, ErrorNotice, useAction } from "./ui";
+import { DisplayWindowProvider } from "./display-window";
 
 type Page =
   "Planner" | "Inbox" | "Tasks" | "Calendar" | "Connections" | "Health";
@@ -78,6 +79,11 @@ export function Application({
     queryFn: ({ signal }) => api.session(signal),
     staleTime: Infinity,
   });
+  useEffect(() => {
+    setEmailId(null);
+    setTaskId(null);
+    setCreateTask(false);
+  }, [session.data?.user?.id]);
   useEffect(() => {
     if (window.location.search)
       window.history.replaceState(null, "", window.location.pathname);
@@ -217,7 +223,10 @@ export function Application({
         {page === "Health" ? (
           <HealthPage />
         ) : (
-          <main className="workspace" key={generation}>
+          <main
+            className="workspace"
+            key={`${generation}:${session.data?.user?.id ?? "anonymous"}`}
+          >
             {outcome && (
               <p className="inline-note" role="status">
                 {outcome}
@@ -238,7 +247,11 @@ export function Application({
               (!authenticated ? (
                 <Onboarding api={api} navigate={navigate} />
               ) : (
-                <>
+                <DisplayWindowProvider
+                  api={api}
+                  userId={session.data.user!.id}
+                  requirePreferences={page !== "Connections" && !emailId}
+                >
                   {!session.data.googleConnected && page !== "Connections" && (
                     <p className="inline-note">
                       Google is disconnected.{" "}
@@ -300,7 +313,7 @@ export function Application({
                       navigate={navigate}
                     />
                   )}
-                </>
+                </DisplayWindowProvider>
               ))}
           </main>
         )}

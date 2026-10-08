@@ -1,4 +1,9 @@
 import { z } from "zod";
+import {
+  displayRangeShape,
+  includeUndatedSchema,
+  validDisplayRange,
+} from "./display.js";
 
 const id = z.uuid();
 const timestamp = z.iso.datetime({ offset: true });
@@ -112,10 +117,17 @@ export const pageQuerySchema = z.strictObject({
   cursor: z.string().max(512).optional(),
   limit: z.coerce.number().int().min(1).max(100).default(50),
 });
-export const inboxQuerySchema = pageQuerySchema.extend({
-  category: categorySchema.optional(),
-  reviewState: reviewStateSchema.optional(),
-});
+export const inboxQuerySchema = pageQuerySchema
+  .extend({
+    ...displayRangeShape,
+    category: categorySchema.optional(),
+    reviewState: reviewStateSchema.optional(),
+    dateField: z.enum(["received", "suggestionDue"]).default("received"),
+    includeUndated: includeUndatedSchema,
+  })
+  .refine(validDisplayRange, {
+    message: "Provide all four ordered display bounds",
+  });
 export const inboxResponseSchema = z.strictObject({
   items: z.array(emailSummarySchema),
   nextCursor: z.string().nullable(),
@@ -163,9 +175,16 @@ export const taskSchema = z.strictObject({
   calendarLink: calendarLinkSchema.nullable(),
   createdAt: timestamp,
 });
-export const tasksQuerySchema = pageQuerySchema.extend({
-  status: taskStatusSchema.optional(),
-});
+export const tasksQuerySchema = pageQuerySchema
+  .extend({
+    ...displayRangeShape,
+    status: taskStatusSchema.optional(),
+    source: z.enum(["gmail", "manual"]).optional(),
+    includeUndated: includeUndatedSchema,
+  })
+  .refine(validDisplayRange, {
+    message: "Provide all four ordered display bounds",
+  });
 export const tasksResponseSchema = z.strictObject({
   items: z.array(taskSchema),
   nextCursor: z.string().nullable(),

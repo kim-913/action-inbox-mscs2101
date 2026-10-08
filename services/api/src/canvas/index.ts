@@ -22,6 +22,7 @@ import {
   validateCanvasFeedUrl,
   type CanvasFeedReader,
 } from "./feed.js";
+import { canvasInRange, filterKey } from "../domain/display-window.js";
 
 const coverage =
   "Only the items exposed by Canvas's bounded calendar feed, typically 30 days past and 366 days ahead; not complete coursework. This app rejects snapshots over 1,000 items rather than truncating them, retaining the last successful import. Undated assignments and To Do items may be absent. No grades, submissions or completion status; date-only assignments have no exact due time. Refresh is manual.";
@@ -128,6 +129,7 @@ const cursorSchema = z.strictObject({
   connectionId: z.uuid(),
   revision: z.uuid(),
   id: z.string().min(1),
+  filter: z.string().length(64),
 });
 function decodeCursor(cursor?: string): z.infer<typeof cursorSchema> | null {
   if (cursor === undefined) return null;
@@ -281,6 +283,7 @@ export function registerCanvas(
       const userId = authenticatedUser(request);
       const query = parse(canvasItemsQuerySchema, request.query);
       const cursor = decodeCursor(query.cursor);
+      const filter = filterKey(userId, query);
       return transaction(runtime, userId, async (client) => {
         const result = await client.query<Snapshot>(
           "SELECT id, snapshot, snapshot_revision, last_successful_fetch_at FROM canvas_connections WHERE user_id=$1",
@@ -294,7 +297,15 @@ export function registerCanvas(
             row.snapshot_revision !== cursor.revision)
         )
           changed();
-        const snapshot = row?.snapshot ?? [];
+        if (cursor && cursor.filter !== filter)
+          throw new ApiFailure(
+            400,
+            "INVALID_REQUEST",
+            "The page cursor does not match these filters.",
+          );
+        const snapshot = (row?.snapshot ?? []).filter((item) =>
+          canvasInRange(item, query),
+        );
         let start = 0;
         if (cursor) {
           const previous = snapshot.findIndex((item) => item.id === cursor.id);
@@ -315,6 +326,7 @@ export function registerCanvas(
                   connectionId: row!.id,
                   revision: row!.snapshot_revision,
                   id: last.id,
+                  filter,
                 }),
               ).toString("base64url")
             : null;

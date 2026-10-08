@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import {
   check,
   index,
+  integer,
   pgTable,
   text,
   timestamp,
@@ -16,6 +17,7 @@ export const users = pgTable(
     googleSubject: text("google_subject").unique(),
     displayName: text("display_name").notNull(),
     timezone: text("timezone").notNull().default("UTC"),
+    displayWindowDays: integer("display_window_days").notNull().default(30),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -29,6 +31,10 @@ export const users = pgTable(
       sql`${table.email} = lower(btrim(${table.email})) AND length(${table.email}) > 3`,
     ),
     check("users_timezone_present", sql`length(btrim(${table.timezone})) > 0`),
+    check(
+      "users_display_window_days_range",
+      sql`${table.displayWindowDays} BETWEEN 1 AND 365`,
+    ),
     check(
       "users_google_subject_present",
       sql`${table.googleSubject} IS NULL OR length(${table.googleSubject}) > 0`,

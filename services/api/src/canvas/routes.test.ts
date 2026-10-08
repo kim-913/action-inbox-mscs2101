@@ -199,6 +199,94 @@ describe.skipIf(!databaseUrl)(
       return canvasItemsResponseSchema.parse(response.json());
     }
 
+    it("filters native dates and overlapping events before snapshot pagination without refreshing", async () => {
+      const date = (value: string) => ({
+        kind: "date" as const,
+        value,
+        timeZone: null,
+      });
+      const snapshot: CanvasItem[] = [
+        item("a-outdated", "2026-10-01T12:00:00Z"),
+        {
+          ...item("b-ended"),
+          kind: "Event",
+          start: date("2026-10-01"),
+          end: date("2026-10-08"),
+        },
+        {
+          ...item("c-overlap"),
+          kind: "Event",
+          start: date("2026-10-07"),
+          end: date("2026-10-09"),
+        },
+        { ...item("d-native"), start: date("2026-10-08") },
+        item("e-instant", "2026-10-08T07:00:00Z"),
+        item("f-end", "2026-10-10T07:00:00Z"),
+        { ...item("g-date-end"), start: date("2026-10-10") },
+        { ...item("h-undated"), start: null },
+        {
+          ...item("i-overlap"),
+          kind: "Event",
+          start: {
+            kind: "instant",
+            value: "2026-10-08T06:00:00Z",
+            timeZone: "UTC",
+          },
+          end: {
+            kind: "instant",
+            value: "2026-10-08T08:00:00Z",
+            timeZone: "UTC",
+          },
+        },
+      ];
+      reader.mockResolvedValueOnce(snapshot);
+      expect((await connect()).statusCode).toBe(200);
+      const query = new URLSearchParams({
+        startAt: "2026-10-08T00:00:00-07:00",
+        endAt: "2026-10-10T00:00:00-07:00",
+        startDate: "2026-10-08",
+        endDate: "2026-10-10",
+        limit: "1",
+      });
+      const first = await items(own, `?${query}`);
+      expect(first.items.map((entry) => entry.id)).toEqual(["c-overlap"]);
+      const found = [...first.items];
+      let cursor = first.nextCursor;
+      while (cursor) {
+        query.set("cursor", cursor);
+        const page = await items(own, `?${query}`);
+        found.push(...page.items);
+        cursor = page.nextCursor;
+      }
+      expect(found.map((entry) => entry.id)).toEqual([
+        "c-overlap",
+        "d-native",
+        "e-instant",
+        "i-overlap",
+      ]);
+      query.set("cursor", first.nextCursor!);
+      query.set("endDate", "2026-10-11");
+      expect(
+        (
+          await app.inject({
+            url: `${canvasRoutes.items}?${query}`,
+            headers: { cookie: own.cookie },
+          })
+        ).statusCode,
+      ).toBe(400);
+      expect((await items()).items).toHaveLength(snapshot.length);
+      expect((await connection()).itemCount).toBe(snapshot.length);
+      expect(reader).toHaveBeenCalledTimes(1);
+      expect(
+        (
+          await app.inject({
+            url: `${canvasRoutes.items}?startDate=2026-10-08`,
+            headers: { cookie: own.cookie },
+          })
+        ).statusCode,
+      ).toBe(400);
+    });
+
     it("requires a signed-in browser and exact Origin plus CSRF for every mutation", async () => {
       for (const url of [canvasRoutes.connection, canvasRoutes.items]) {
         expect((await app.inject(url)).statusCode).toBe(401);
