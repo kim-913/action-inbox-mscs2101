@@ -4,13 +4,15 @@ Action Inbox is a browser-first, source-linked connected planner. Consented Gmai
 
 ## Status
 
-The repository is local-only. Do not add a remote or publish it without the project owner's approval. The browser/API implementation includes cookie-based Google login, bounded durable Gmail import, source review, tasks, an internal planner, a separate read-only Sofia Canvas calendar subscription, explicit external Calendar approval, and retention controls. The user reported successful real Google sign-in/import and, after the identified-client fix, successful real Canvas import. This is not all-user provider or paid-model acceptance. Paid extraction remains disabled. See `docs/architecture/api-contract.md`, `docs/architecture/deployment.md`, `docs/testing/p0-evidence.md`, and `docs/testing/canvas-subscription-evidence.md` for observed checks and limits.
+The repository is hosted privately at [kim-913/mscs2101](https://github.com/kim-913/mscs2101) with the project owner's approval. Keep credentials, local data, and handoff notes out of Git; do not make the repository public without separate approval. The browser/API implementation includes cookie-based Google login, bounded durable Gmail import, source review, tasks, an internal planner, a separate read-only Sofia Canvas calendar subscription, explicit external Calendar approval, and retention controls. The user reported successful real Google sign-in/import and, after the identified-client fix, successful real Canvas import. This is not all-user provider or paid-model acceptance. Paid extraction remains disabled. See `docs/architecture/api-contract.md`, `docs/architecture/deployment.md`, `docs/testing/p0-evidence.md`, and `docs/testing/canvas-subscription-evidence.md` for observed checks and limits.
 
 ### Approved Phase 2 direction
 
 The user approved incremental Outlook and Canvas connectors, a first-class internal calendar rather than requiring an external calendar, and optional reminders one or two days before assignments plus immediate/time-sensitive work such as flights. Broader OAuth integrations and notification delivery remain roadmap goals. The separately approved Canvas calendar-only subscription below is narrower than full course/grade/submission access. Official API setup/consent is still required for future full integrations; Canvas assignment due dates can be native data, while event times are not automatically deadlines.
 
 Notification delivery and any SMS option need separate permission, mechanism, cost approval, and observed end-to-end delivery. No SMS provider, paid account, message send, or fake enabled control is authorized by the roadmap. Existing P0 AC-09 remains an explicit unresolved delivery criterion. See `docs/requirements/phase-2.md`, `docs/testing/connector-prerequisites.md`, and the authoritative `EXECUTION_PLAN.md`.
+
+Next requested feature, not yet implemented: one user-configurable display window shared across all connectors/systems, with 7-day, 30-day, and custom day-count choices. Repository setup comes first; the date-window feature remains deferred. Its date direction and source-specific date semantics must be resolved before implementation; this request does not authorize deleting older stored data.
 
 ### Canvas calendar-only connection
 
