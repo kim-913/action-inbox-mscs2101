@@ -34,7 +34,7 @@ Do not silently change requirements, provider contracts, security policy, or dat
 
 Follow [CONTRIBUTING.md](../../CONTRIBUTING.md) for the canonical branch, synchronization, CI, and merge procedure rather than maintaining another setup recipe. PRs require **zero approvals**. Authors may self-review and squash-merge after `Quality gate` succeeds on the latest commit, current `main` is integrated, the diff is conflict-free, and conversations are resolved. GitHub does not support self-approval; self-review does not create an approval. Optional technical peer review is separate from required verification and any required non-author course-artifact review.
 
-This is mandatory team policy, not enforced branch protection: the private repository's current plan returns HTTP 403 for protection access. Keep it private; CI does not prevent direct pushes or premature merges.
+The repository is public with enforced `main` protection, including for administrators: PRs, successful required `Quality gate` checks against up-to-date `main`, resolved conversations, and linear history are required; force pushes to and deletion of `main` are blocked. Required approvals remain zero. Anyone may read, fork, and propose a PR; only authorized writers may push repository branches or merge eligible PRs. Public source is not application deployment or permission to access private contributor/user data. Keep all shared artifacts sanitized and follow the contributor guide.
 
 ## Workflow
 
