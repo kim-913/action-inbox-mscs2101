@@ -27,3 +27,11 @@ npm-debug.log*
 .omp/
 .config/
 .local-preview/
+
+# Local session handoffs (never publication evidence)
+.handoff/
+NEXT_SESSION*.md
+next_session*.md
+*HANDOFF*.md
+*Handoff*.md
+*handoff*.md
