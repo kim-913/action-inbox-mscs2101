@@ -1,0 +1,31 @@
+{
+  "name": "action-inbox",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Browser-first, evidence-backed action extraction from Gmail.",
+  "workspaces": [
+    "apps/*",
+    "services/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:web": "npm run dev --workspace @action-inbox/web",
+    "dev:api": "npm run dev --workspace @action-inbox/api",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "lint": "eslint .",
+    "format:check": "prettier --check .",
+    "format": "prettier --write .",
+    "db:migrate": "npm run db:migrate --workspace @action-inbox/api"
+  },
+  "engines": {
+    "node": ">=22.12"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.37.0",
+    "eslint": "^9.37.0",
+    "typescript-eslint": "^8.46.0",
+    "prettier": "^3.6.2",
+    "typescript": "^5.9.3"
+  }
+}
