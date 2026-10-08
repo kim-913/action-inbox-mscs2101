@@ -4,7 +4,7 @@ Start here to work on Action Inbox as a teammate or coding agent. The repository
 
 ## 1. Pick your role
 
-Roles are responsibilities, not confirmed assignments to GitHub usernames. One person can cover multiple roles; a significant change still needs a non-author reviewer.
+Roles are responsibilities, not confirmed assignments to GitHub usernames. One person can cover multiple roles. Code PRs require **zero approvals**: authors may self-review and self-merge after the gates below. Independent course-artifact review remains a separate evidence requirement.
 
 | Role                               | Owns                                                          | First artifact                                        | Reusable agent instructions                      |
 | ---------------------------------- | ------------------------------------------------------------- | ----------------------------------------------------- | ------------------------------------------------ |
@@ -150,24 +150,51 @@ Without database configuration the API can provide health only; `/v1/health` suc
 
 ## 4. Implement, review, and prove a change
 
-1. PM records the requirement, acceptance criteria, scope exclusions, owner, reviewer, and source. UI/QA add states and failure cases before implementation where relevant.
-2. Create a short-lived branch, for example `git switch -c feature/shared-date-window`. Use `fix/` or `docs/` for other work. Do not rewrite shared history.
-3. Read the relevant contracts and role Skill. Keep one integration owner for changes spanning UI/contracts/API/database. Coordinate file ownership before concurrent agent edits.
-4. Implement the complete path. Add a new migration for schema changes; do not edit already-applied migrations. Cover meaningful behavioral boundaries, not source-text or mock-forwarding assertions.
-5. Run focused checks while developing. Before review, run the shared gates below once on the integrated change and exercise the actual changed UI/API path.
-6. Open a PR with acceptance/evidence links, scope/limitations, migration/config impacts, and a safe deployment/rollback note. Request the appropriate non-author reviewer; role-specific reviews follow the execution plan.
-7. Merge only after observed evidence and review. This is the team's workflow, **not a claim that branch protection or CI has been configured**. Publishing source does not deploy or submit anything to Canvas.
+1. Record the requirement, acceptance criteria, scope exclusions, owner, and evidence source. Coordinate overlapping work and designate one integration owner before concurrent edits; UI/QA add states and failure cases where relevant.
+2. Start a short-lived `feature/*`, `fix/*`, `docs/*`, or `chore/*` branch from current `origin/main`, with a clean working tree:
 
-Shared gates, using only the disposable test-suite database:
+   ```bash
+   git fetch origin
+   git switch -c feature/shared-date-window origin/main
+   ```
+
+3. Read the relevant contracts and role Skill. Implement one coherent PR with its tests and documentation. Add new migrations rather than editing applied migrations; stage only owned files. Do not push directly to `main`, force-push `main`, or rewrite shared branches.
+4. Before opening the PR and again whenever `main` advances, synchronize on your working branch without rebasing shared history:
+
+   ```bash
+   git fetch origin
+   git merge origin/main
+   ```
+
+   Resolve conflicts with affected owners, inspect the entire resulting diff, and commit the resolution. Never discard another contributor's change merely to make a merge succeed. Integrate parallel work before running shared checks centrally.
+
+5. Run the shared gates below and exercise the changed UI/API path where applicable. Push your branch, for example `git push -u origin feature/shared-date-window`, then open a PR **to `main`** with acceptance/evidence links, scope/limitations, migration/config impacts, and a safe deployment/rollback note.
+6. Self-review the final diff and resolve all PR conversations. No non-author approval is required; GitHub does not let authors approve their own PR, and a self-review does not require an approval event. Optional teammate review and independent course evidence do not create an approval gate.
+7. Immediately before merging, confirm that the PR includes current `main`, has no conflicts, and the `CI` workflow's **`Quality gate`** check succeeded for the latest PR commit and current integration with `main`. If either branch changes, synchronize as needed and wait for a fresh successful run; an old green run is insufficient. Do not merge failed, skipped, cancelled, or pending gates.
+8. The author may **squash-merge** the PR, then delete the merged branch. Use squash only; do not use merge-commit or rebase merging. Source publication is not deployment or permission to submit to Canvas.
+
+### Enforcement status
+
+These are mandatory team rules, **not server-enforced branch protection**. On 2026-10-08, GitHub's protection API returned HTTP 403: `Upgrade to GitHub Pro or make this repository public to enable this feature.` Keep the repository private; do not change visibility to bypass this limitation. CI reports results but cannot prevent direct pushes or an author merging without satisfying policy. If a supported private-repository plan becomes available, configure PR-only, up-to-date/conflict-free merges, resolved conversations, and required check `Quality gate` with **zero required approvals**.
+
+GitHub repository settings are configured for squash-only merging, automatic deletion of merged branches, and the update-branch option; merge-commit and rebase merging are disabled. Actions is enabled. These settings do not make PR use, successful CI, or up-to-date branches mandatory at the server: both branch-protection and ruleset APIs returned the 403 limitation above. No paid upgrade or public publication is authorized.
+
+### Shared quality gates
+
+The workflow at [`.github/workflows/ci.yml`](.github/workflows/ci.yml) is named `CI`, with stable job/check name `Quality gate`. It runs on pull requests, pushes to `main`, and manual dispatch using Node.js 22, npm 11, and disposable PostgreSQL 16. It performs dependency installation, typechecking, linting, formatting checks, the full test suite with `TEST_DATABASE_URL`, and an isolated web production build. It does not use real secrets/providers, deploy, or replace changed-path acceptance evidence.
+
+Local equivalent, using only the disposable test-suite database created in section 3:
 
 ```bash
+npm ci
 npm run typecheck
-TEST_DATABASE_URL=postgresql://postgres:local-only@127.0.0.1:55433/action_inbox_test npm test
 npm run lint
 npm run format:check
+TEST_DATABASE_URL=postgresql://postgres:local-only@127.0.0.1:55433/action_inbox_test npm test
+VITE_API_URL=http://127.0.0.1:3002 npm run build --workspace @action-inbox/web -- --outDir ../../.local-preview/ci-dist
 ```
 
-Without `TEST_DATABASE_URL`, database tests skip; label the run accordingly. Never point tests at the browser-fixture or user database. For a focused suite, use its workspace, for example:
+Without `TEST_DATABASE_URL`, database tests skip; label that run accordingly and do not count it as the full merge gate. CI must run database suites without skips. Never point tests at the browser-fixture or user database. For a focused suite, use its workspace, for example:
 
 ```bash
 npm run test --workspace @action-inbox/web -- src/CanvasFeed.test.tsx
@@ -185,6 +212,8 @@ Observe the changed path in the browser and record viewport, steps, expected/act
 ## 5. Course deliverables and team evidence
 
 The course needs below come from the **previously recorded Canvas/syllabus observations in [EXECUTION_PLAN section 14](EXECUTION_PLAN.md#14-course-deliverables-and-traceability)**. They are not newly scraped or independently revalidated requirements. PM must confirm the current Canvas rubric, due dates, group number, and submission format before delivery; do not infer deadlines from fixtures or old milestones.
+
+Course documents still need independent non-author review, and the recorded code-review deliverable needs findings/resolutions as evidence. These are course-artifact completion requirements, not required GitHub approvals or a ban on author self-merge.
 
 | Recorded course need                                                          | Lead / reviewer                  | Artifact and completion evidence                                                         |
 | ----------------------------------------------------------------------------- | -------------------------------- | ---------------------------------------------------------------------------------------- |

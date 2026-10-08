@@ -21,14 +21,20 @@ Use this skill for user flows, wireframes, interface copy, responsive/accessibil
 
 - Requested workflow, user goal, scope (P0 or approved Phase 2), and requirement/acceptance IDs.
 - Current capability/evidence status, relevant source files, synthetic scenarios, and known defects.
-- Target browser/device/viewport, display timezone, and designated human reviewer. Mark missing facts as unconfirmed; never invent a device assignment.
+- Target browser/device/viewport, display timezone, and verification owner; identify a non-author reviewer when a course artifact requires one. Mark missing facts as unconfirmed; never invent a device assignment.
 - Whether the task authorizes design only, application edits, or actual browser review. Lack of runtime access limits evidence, not honesty.
 
 ## Responsibilities and boundaries
 
-Own flow clarity, state matrices, information hierarchy, source/evidence presentation, responsive behavior, accessibility review, and anonymized usability/evaluation cases. Give Developer implementable behavior and QA observable expectations. PM reviews alignment with acceptance/customer value; QA reviews testability; a non-author reviews the artifact.
+Own flow clarity, state matrices, information hierarchy, source/evidence presentation, responsive behavior, accessibility review, and anonymized usability/evaluation cases. Give Developer implementable behavior and QA observable expectations. PM reviews alignment with acceptance/customer value; QA reviews testability. Obtain non-author review for course artifacts where required; technical peer review of a PR is optional.
 
 Do not silently change requirements, provider contracts, security policy, or date meaning. Do not implement an unrelated backend feature, buy a service, use a paid model, send notifications, submit coursework, or assign people to roles. A design or screenshot is not integration, security, model-accuracy, or delivery acceptance.
+
+### PR policy and separate review obligations
+
+Follow [CONTRIBUTING.md](../../CONTRIBUTING.md) for the canonical branch, synchronization, CI, and merge procedure rather than maintaining another setup recipe. PRs require **zero approvals**. Authors may self-review and squash-merge after `Quality gate` succeeds on the latest commit, current `main` is integrated, the diff is conflict-free, and conversations are resolved. GitHub does not support self-approval; self-review does not create an approval. Optional technical peer review is separate from required verification and any required non-author course-artifact review.
+
+This is mandatory team policy, not enforced branch protection: the private repository's current plan returns HTTP 403 for protection access. Keep it private; CI does not prevent direct pushes or premature merges.
 
 ## Workflow
 
@@ -99,7 +105,10 @@ Evidence: revision, environment, fixtures, steps, observed result, screenshot pa
 Not run / known limitations:
 Decisions and reasons / unresolved questions:
 Developer actions / QA scenarios / PM acceptance implications:
-Owner role / non-author reviewer / review status:
+Owner role / required verification status:
+PR / latest commit / main integration / author self-review / Quality gate / conflicts / conversations:
+Optional technical peer review status:
+Course-artifact non-author reviewer / status (or not applicable):
 Next action and required authorization (if any):
 ```
 
@@ -108,5 +117,5 @@ Next action and required authorization (if any):
 - Every scoped acceptance ID maps to an observable UI result; every relevant loading, empty, error, partial, stale, disabled, and success state has an intentional treatment.
 - Date meanings, source attribution, review/approval boundaries, and unavailable-capability labels match actual contracts.
 - Mobile and accessibility expectations are explicit; real-surface evidence is attached only if actually observed, with missing coverage disclosed.
-- Developer and QA can implement/review from the handoff; non-author review is recorded or remains an explicit open gate.
+- Developer and QA can implement/review from the handoff; required verification and applicable non-author course-artifact review are recorded or remain explicit open acceptance gates. Optional technical peer review is not a PR merge requirement.
 - No private source text, secret feed URL, token, `.env` value, or personal browser data enters deliverables. No fake OAuth/reminder claim, unapproved external write, or runtime disruption is introduced.

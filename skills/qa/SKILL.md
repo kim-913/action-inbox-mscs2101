@@ -28,6 +28,12 @@ Resolve facts from repository evidence first. Escalate only missing acceptance d
 
 Own observable test cases, coverage gaps, reproducible defect reports, evidence classification, regression assessment, and the release recommendation. Coordinate implementation fixes with Developer, usability findings with UI Designer, and scope/acceptance decisions with PM. Do not silently weaken acceptance, redefine severity, bypass production guards, fix unrelated application code, or declare a release accepted because a local suite passed.
 
+### PR policy and separate review obligations
+
+Use [CONTRIBUTING.md](../../CONTRIBUTING.md) as the canonical branch, synchronization, CI, and merge procedure. PRs require **zero approvals**; the author may self-review and squash-merge after `Quality gate` succeeds on the latest commit, current `main` is integrated, the diff is conflict-free, and conversations are resolved. GitHub cannot self-approve: author self-review is not an approval event. Technical peer review is optional. Required verification and applicable non-author course-artifact review remain separate obligations, not a required PR approval.
+
+The private repository's current plan returns HTTP 403 for branch-protection access. These are mandatory team rules, not server-enforced protection; CI cannot prevent direct pushes or premature merges. Do not make the repository public to obtain protection.
+
 ## Test boundaries and navigation
 
 | Level                        | Existing entry points                                                                                                                                                    | What the evidence does and does not establish                                                                                                                                                                              |
@@ -49,7 +55,7 @@ Root check entry points are `npm run typecheck`, `npm test`, `npm run lint`, and
 4. **Exercise the actual boundary.** Synthetic smoke uses API 3002 and browser 5174, a dedicated clean browser profile, and a separate build output directory. Preserve the live 3000/5173 services and `apps/web/dist`. `npm run smoke:local-providers` defaults to disabled extraction; `SMOKE_EXTRACTION=synthetic` explicitly selects a loopback synthetic response, never paid AI. The harness has no browser assertions by itself; document the actual browser actions separately. Follow CONTRIBUTING for its OAuth test orchestration without weakening the production Google redirect allowlist.
 5. **Test affected invariants.** As applicable, cover approval before task/event creation, three identical syncs, Calendar retry/lost response, cross-user access, source quotations, uncertain/date-only/timezone handling, last-success retention, partial pagination, and disabled extraction with readable imports. Canvas refresh/disconnect tests must preserve independent Google/Canvas lifecycles and must not infer completion from feed disappearance. Notification metadata is not delivered notification evidence.
 6. **Report and retest.** File the smallest synthetic reproducer, severity and release effect. A fixed S0–S2 defect needs a regression demonstrating the consumer-visible failure and correction. Preserve prior failure evidence; add the correction result only when actually observed.
-7. **Assess acceptance.** Map each AC to evidence plus remaining gaps. Request non-author review. PM owns approved scope changes; QA must not relabel blocked work as complete to meet a date.
+7. **Assess acceptance.** Map each AC to evidence plus remaining gaps. Obtain non-author review for course evidence where required; request optional technical peer review when useful without making it a PR merge gate. PM owns approved scope changes; QA must not relabel blocked work as complete to meet a date.
 
 ## Severity and release rules
 
@@ -94,6 +100,9 @@ Not run / skipped / blocked (reason and prerequisite):
 AC → evidence type (synthetic / live approved / user-reported) → remaining gap:
 Defects and regression status:
 Release recommendation and unresolved gates:
+PR / latest commit / main integration / author self-review / Quality gate / conflicts / conversations:
+Optional technical peer review status:
+Required course-artifact non-author review (status or not applicable):
 Next owner and authorized action:
 ```
 

@@ -32,9 +32,15 @@ Own schedule/dependencies, standups, SDP/SPMP, EARS requirements, acceptance tra
 
 Do not redefine technical truth, waive a failed gate without an approved scope/criterion change, perform tests by proxy, spend money, register services, assign usernames to roles, or submit anything to Canvas. All members participate in the pitch, final presentation, and oral defense; participation is not proof that every member did identical implementation work.
 
+### PR policy and separate review obligations
+
+[CONTRIBUTING.md](../../CONTRIBUTING.md) is canonical for branch ownership, synchronization, CI, and merge procedure. Require **zero PR approvals**: authors may self-review and squash-merge after `Quality gate` succeeds on the latest commit, current `main` is integrated, the diff is conflict-free, and conversations are resolved. GitHub does not allow self-approval; do not assign an author to approve their own PR. Technical peer review is optional, while required verification and the course-artifact non-author reviews below remain separate obligations. A merged PR is not proof of course or release acceptance.
+
+Protection access for the private repository returns HTTP 403 under the current plan. Record these as mandatory team rules, not server-enforced branch protection; CI cannot prevent direct pushes or premature merges. Keep the repository private.
+
 ## Recorded course-deliverable map
 
-Use this role-based coordination map derived from plan sections 11 and 14; confirm individual assignments separately. Reviewers must be non-authors. If roles share a person, obtain another qualified reviewer instead of counting self-review.
+Use this role-based coordination map derived from plan sections 11 and 14; confirm individual assignments separately. Reviewers of these course artifacts must be non-authors. If roles share a person, obtain another qualified reviewer instead of counting self-review. This course-evidence review, including the recorded code-review artifact, does not require GitHub PR approval or a non-author review on every PR.
 
 | Recorded deliverable           | Expected artifact/content                                                                                                                                                 | Accountable role                                                              | Non-author review role                                                                  |
 | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
@@ -81,7 +87,7 @@ A test count, screenshot, or component demo is not blanket acceptance. AC-10 req
 
 Separate P0, P1, approved Phase 2, and deferred work. A requested change enters P0 only under the execution plan's change-control rule: instructor-required, replaces comparable effort, or protects an invariant. Record the request/source, rationale, affected criteria/artifacts, alternatives, role owner/reviewer, dependency/schedule impact, decision authority, and actual approval. Approval of a roadmap is not approval of spending, credentials, provider writes, or changed acceptance.
 
-Give each work item an input, deliverable, acceptance evidence, responsible role, non-author reviewer, and unblock condition. Escalate the exact missing prerequisite; do not schedule fake integration work around a missing provider capability. No-owner/unconfirmed assignments remain visible rather than being attributed to a username.
+Give each work item an input, deliverable, acceptance evidence, responsible role, verification owner, and unblock condition. Assign a non-author reviewer where course-artifact review is required; identify technical PR peer review as optional. Escalate the exact missing prerequisite; do not schedule fake integration work around a missing provider capability. No-owner/unconfirmed assignments remain visible rather than being attributed to a username.
 
 ### 4. Collect weekly individual and AI-use evidence
 
@@ -115,19 +121,22 @@ Use the plan's release conditions: all P0 evidence, no open S0/S1/S2 defects, th
 
 ### 6. Review and hand off
 
-Check artifact constraints against the recorded map, route to a non-author, and capture findings/resolutions. Prepare proposal/pitch/report for human review, not submission. Canvas submission/posting/messaging remains a separate action requiring explicit confirmation for that specific action; this skill does not authorize it.
+Check course-artifact constraints against the recorded map, route required course reviews to a non-author, and capture findings/resolutions separately from optional technical PR peer review and required verification. Prepare proposal/pitch/report for human review, not submission. Canvas submission/posting/messaging remains a separate action requiring explicit confirmation for that specific action; this skill does not authorize it.
 
 ```text
 PM handoff
 Objective / approved scope / decision authority:
 Source paths and authority (recorded plan vs newly authorized evidence):
 Changed artifacts / requirement and acceptance IDs:
-Deliverable: owner role | reviewer | status | evidence | remaining gate
+Deliverable: owner role | course reviewer if required | status | evidence | remaining gate
 Traceability and final-report coverage:
 Decisions / risk changes / dependency and schedule effects:
 Dates: source, timezone, assumptions, verification status (or unconfirmed)
 Individual contributions / AI-use evidence / human review:
 Checks actually observed / not run:
+PR / latest commit / main integration / author self-review / Quality gate / conflicts / conversations:
+Optional technical peer review status (not a merge gate):
+Required course-artifact non-author review status (or not applicable):
 Open gates and exact prerequisites:
 Next agent or role / first reads / concrete next action:
 External actions requiring separate confirmation:
