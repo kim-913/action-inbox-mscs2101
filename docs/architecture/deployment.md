@@ -58,6 +58,8 @@ Set `WEB_ORIGIN` to one exact HTTP(S) origin without a trailing slash or path. P
 
 ## Google
 
+For step-by-step teammate access requests, maintainer approval, local setup, troubleshooting, and the distinction from production-user onboarding, see [Google developer onboarding](../testing/google-developer-onboarding.md).
+
 Use a Google **Web application** OAuth client, a registered `/v1/auth/google/callback` backend URL, and an explicit comma-separated `GOOGLE_ALLOWED_EMAILS` list of approved test accounts. `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI`, and `TOKEN_ENCRYPTION_KEY` must be supplied locally/deployment-side. The encryption key is canonical base64 of 32 cryptographically random bytes. Do not use Desktop OAuth credentials or embed credentials in the browser build. Backend validates identity token issuer, audience, nonce and verified email; authorization remains per authenticated user on every data operation.
 
 Scopes and cookie decisions are in ADR-003. Production provider endpoints are pinned; local sanitized provider tests supply alternate URLs directly to the runtime configuration, not through public request parameters. No provider token is returned to the browser.
