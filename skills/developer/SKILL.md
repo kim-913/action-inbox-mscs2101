@@ -16,6 +16,7 @@ Paths below are relative to the repository root unless linked.
 1. Read [CONTRIBUTING.md](../../CONTRIBUTING.md) for setup, isolated development, review, and handoff conventions; follow applicable `AGENTS.md` instructions.
 2. Read [EXECUTION_PLAN.md](../../EXECUTION_PLAN.md), especially scope and AC-01–AC-14, security invariants, API/domain rules, and release gates. Sections 11 and 14 contain previously recorded team/course context, not newly verified Canvas requirements. This skill's workflow is a project convention, not an instructor mandate.
 3. Read `README.md`, `docs/architecture/api-contract.md`, and the affected requirements/ADR. For runtime work, read `docs/architecture/deployment.md` before starting services or building assets.
+   - For real Gmail/Calendar onboarding, use [Google developer onboarding](../../docs/testing/google-developer-onboarding.md) for account requests, maintainer approval, private configuration, failure diagnosis, costs, and production boundaries. Do not treat synthetic setup or repository access as real-provider authorization.
 4. Read the implementation and nearby tests for the affected flow. Check current `package.json` scripts rather than assuming a command exists.
 
 | Boundary                             | Start here                                                                                |

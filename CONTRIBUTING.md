@@ -138,6 +138,8 @@ Restarting the harness generates a new encryption key. Use disposable fixture da
 
 Use this only when a task requires real-provider behavior. Coordinate test-account approval and credentials with the owner privately. [Deployment configuration](docs/architecture/deployment.md) and [connector prerequisites](docs/testing/connector-prerequisites.md) are authoritative.
 
+For a teammate's first real Gmail connection, follow the [Google developer onboarding guide](docs/testing/google-developer-onboarding.md): private access request, maintainer approval, both allowlists, exact local OAuth configuration, troubleshooting, costs, and the separate production-user flow. Completing Mode A or cloning the repository does not grant real Google access.
+
 In a **fresh checkout without an existing `.env`**, copy `.env.example` to `.env`. Configure your own development database (not `action_inbox_test`, `action_inbox_smoke`, or the persistent user database), `API_PORT`, exact `WEB_ORIGIN`, and approved OAuth callback. Set the matching `VITE_API_URL` in the web shell or `apps/web/.env`; root `.env` does not configure Vite. Keep `OPENAI_ENABLED=false`.
 
 ```bash
