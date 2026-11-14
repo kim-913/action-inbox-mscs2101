@@ -1,0 +1,34 @@
+%% Code reviewed: 251dfec1e3121fe90af9568c022010b4568a6179; November 13, 2026.
+%% Structure unchanged from original 025c2f0 baseline.
+classDiagram
+  class SyncWorker {
+    <<module>>
+    +processSync(runtime, job, extractor, gmail)
+  }
+  class Extractor {
+    <<interface>>
+    +string version
+    +string model
+    +extract(input) Promise~Extraction~
+  }
+  class GmailReader {
+    -GoogleGateway google
+    -string baseUrl
+    +listRecent(userId) Promise~string[]~
+    +get(userId, messageId) Promise~NormalizedMessage~
+  }
+  class GoogleGateway {
+    <<interface>>
+    +request(userId, url, init) Promise~unknown~
+    +revoke(userId) Promise~void~
+  }
+  class OpenAIExtractor {
+    -OpenAI client
+    +string model
+    +string version
+    +extract(input) Promise~Extraction~
+  }
+  SyncWorker ..> Extractor : uses injected
+  SyncWorker ..> GmailReader : uses one reader
+  GmailReader --> "1" GoogleGateway : google
+  OpenAIExtractor ..|> Extractor
