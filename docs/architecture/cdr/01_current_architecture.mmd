@@ -1,0 +1,11 @@
+%% Code reviewed: 251dfec1e3121fe90af9568c022010b4568a6179; November 13, 2026.
+%% Structure unchanged from original 025c2f0 baseline.
+flowchart TB
+  UI["React Web UI"] -->|"HTTPS"| API["Fastify API"]
+  API -->|"read / write"| DB["PostgreSQL"]
+  API -->|"enqueue Gmail job"| Worker["pg-boss / processSync"]
+  Worker --> DB
+  Worker -->|"read"| Gmail["Gmail API"]
+  Worker -.->|"if enabled"| AI["OpenAI structured extraction"]
+  API -->|"read + separately confirmed write"| Calendar["Google Calendar"]
+  API -->|"read only"| Canvas["Canvas Calendar Feed"]

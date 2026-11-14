@@ -1,0 +1,25 @@
+%% Code reviewed: 251dfec1e3121fe90af9568c022010b4568a6179; November 13, 2026.
+%% Structure unchanged from original 025c2f0 baseline.
+sequenceDiagram
+  participant UI as Inbox UI
+  participant API as Fastify API
+  participant DB as PostgreSQL
+  UI->>API: POST approve (version, title?, dueAt?)
+  Note over API: requireUser: session + Origin/CSRF, then parse ID/body
+  API->>DB: BEGIN; lock user FOR UPDATE
+  API->>DB: SELECT suggestion by id + user_id FOR UPDATE
+  Note over API,DB: Missing user or owned suggestion rolls back (401/404)
+  alt Already Approved
+    API->>DB: SELECT existing owned task; serializeTask
+    API->>DB: COMMIT
+    API-->>UI: Existing task; invalidate private queries
+  else Not Proposed or version mismatch
+    API->>DB: ROLLBACK
+    API-->>UI: 409 Conflict
+  else Valid Proposed
+    API->>DB: UPDATE suggestion Approved, title, dueAt, version + 1
+    API->>DB: INSERT task with same user and source IDs
+    API->>DB: serializeTask; COMMIT
+    API-->>UI: New task; invalidate private queries
+  end
+  Note over UI,API: Calendar creation requires a separate confirmation and request

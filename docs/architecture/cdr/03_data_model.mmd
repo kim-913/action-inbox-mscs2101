@@ -1,0 +1,47 @@
+%% Code reviewed: 251dfec1e3121fe90af9568c022010b4568a6179; November 13, 2026.
+%% Structure unchanged from original 025c2f0 baseline.
+erDiagram
+  users ||--o{ email_messages : owns
+  users ||--o{ suggestions : owns
+  users ||--o{ tasks : owns
+  email_messages ||--o{ suggestions : yields
+  suggestions |o--o| tasks : optionally_approved_as
+  tasks ||--o| calendar_event_links : has
+  users {
+    uuid id PK
+    text email UK
+  }
+  email_messages {
+    uuid id PK
+    uuid user_id FK
+    text gmail_message_id "unique per user"
+    text normalized_body
+  }
+  suggestions {
+    uuid id PK
+    uuid user_id FK
+    uuid email_id FK "composite FK with user_id"
+    text title
+    timestamptz due_at "nullable"
+    jsonb evidence
+    text review_state
+    int version
+    text fingerprint "unique per user"
+    text action_key "unique per user and email"
+  }
+  tasks {
+    uuid id PK
+    uuid user_id FK
+    uuid source_suggestion_id FK,UK "nullable"
+    uuid source_email_id FK "nullable; composite source FK"
+    uuid request_id "nullable; unique per user"
+    text title
+    timestamptz due_at "nullable"
+    text status
+  }
+  calendar_event_links {
+    uuid task_id PK,FK
+    text google_event_id UK
+    text status
+    jsonb request_content
+  }
