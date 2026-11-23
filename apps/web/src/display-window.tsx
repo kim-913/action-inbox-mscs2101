@@ -173,12 +173,13 @@ export function DisplayWindowProvider({
         className="display-window surface"
         aria-labelledby="display-window-heading"
       >
-        <div>
+        <div className="display-window-summary">
           <h2 id="display-window-heading">Display window</h2>
-          <p className="section-note">
-            One saved setting for all sources. Display only: no data deletion or
-            extra imports.
-          </p>
+          {preferences.data && (
+            <p className="section-note">
+              Saved: {windowDays} days, including today
+            </p>
+          )}
         </div>
         {preferences.isPending && (
           <p role="status">Loading saved display window…</p>
@@ -193,12 +194,23 @@ export function DisplayWindowProvider({
           </button>
         )}
         {preferences.data && (
-          <DisplayWindowPicker
-            key={windowDays}
-            api={api}
-            userId={userId}
-            windowDays={windowDays}
-          />
+          <details className="display-window-controls">
+            <summary aria-label="Change display window">Change</summary>
+            <DisplayWindowPicker
+              key={windowDays}
+              api={api}
+              userId={userId}
+              windowDays={windowDays}
+            />
+            <p className="section-note">
+              One saved setting for all sources. Display only: no data deletion
+              or extra imports. Gmail uses received dates; tasks and proposals
+              use due dates. Canvas and Calendar events overlapping the upcoming
+              interval are included; undated work stays separate. Dates are
+              inclusive local calendar days, including today, in the displayed
+              browser timezone.
+            </p>
+          </details>
         )}
       </section>
       {(preferences.data || !requirePreferences) && children}
@@ -247,8 +259,11 @@ function DisplayWindowPicker({
         }, "Display window saved.");
       }}
     >
-      <fieldset disabled={action.pending} className="display-window-fields">
-        <legend>Saved: {windowDays} days, including today</legend>
+      <fieldset
+        disabled={action.pending}
+        className="display-window-fields"
+        aria-label="Display window settings"
+      >
         <label>
           Display days
           <select
@@ -274,9 +289,11 @@ function DisplayWindowPicker({
             />
           </label>
         )}
-        <button type="submit">Apply display window</button>
+        <button type="submit" aria-label="Apply display window">
+          Apply
+        </button>
       </fieldset>
-      <ActionNotice action={action} />
+      <ActionNotice action={action} pendingMessage="Saving display window…" />
     </form>
   );
 }
@@ -292,14 +309,9 @@ export function DisplayRange({
   end.setDate(end.getDate() - 1);
   return (
     <p className="display-range">
-      {direction === "recent"
-        ? "Gmail received"
-        : "Tasks due / Canvas and Calendar dates"}
-      : {interval.startDate} through {localDay(end)} (inclusive),{" "}
-      {display.windowDays} local calendar days including today. Timezone:{" "}
-      {Intl.DateTimeFormat().resolvedOptions().timeZone}.{" "}
-      {direction === "upcoming" &&
-        "Events overlapping this interval are included; undated work is separate."}
+      <strong>{direction === "recent" ? "Received" : "Due / scheduled"}</strong>
+      : {interval.startDate} – {localDay(end)} (inclusive) ·{" "}
+      {Intl.DateTimeFormat().resolvedOptions().timeZone}
     </p>
   );
 }

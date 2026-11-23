@@ -1,0 +1,17 @@
+{
+  "expires": "2026-12-31",
+  "reviewOwner": "Developer / security review",
+  "reason": "SEC-SECRET-01: generic-api-key mistakes the public phrase grade/submission for a credential. Match is accepted only on these exact complete source lines; any changed line or additional finding fails.",
+  "gitleaks": [
+    {
+      "file": "CONTRIBUTING.md",
+      "rule": "generic-api-key",
+      "lineSha256": "50f6f3d157a05bf5d4880fb69d035940a3322cf202ffb3c0d2a51ba14e30d553"
+    },
+    {
+      "file": "skills/ui-designer/SKILL.md",
+      "rule": "generic-api-key",
+      "lineSha256": "63f91f5986322c841e999150a4f2a178d5f3fbd4909764d27b2a174545cafcf3"
+    }
+  ]
+}

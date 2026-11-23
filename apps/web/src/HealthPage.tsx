@@ -30,22 +30,28 @@ export function HealthPage() {
   }, []);
 
   return (
-    <main className="shell">
-      <header className="intro">
-        <p className="eyebrow">Action Inbox</p>
-        <h1>A clear next step starts with a connection.</h1>
+    <main className="shell health-page">
+      <header className="intro health-heading">
+        <h1>Service health</h1>
         <p className="description">
           Check that this browser can reach the Action Inbox API. This page
           reports a live service response, not sample data.
         </p>
       </header>
-      <section className="health-card" aria-labelledby="health-heading">
+      <section
+        className="health-card"
+        data-state={state.status}
+        aria-labelledby="health-heading"
+      >
         <div className="card-heading">
+          <span className="health-signal" aria-hidden="true" />
           <h2 id="health-heading">Service connection</h2>
           <span className={`badge ${state.status}`}>{state.status}</span>
         </div>
         <div role="status" aria-live="polite" aria-atomic="true">
-          {state.status === "loading" && <p>Checking the API connection…</p>}
+          {state.status === "loading" && (
+            <p className="loading-state">Checking the API connection…</p>
+          )}
           {state.status === "connected" && (
             <>
               <h3>Connected to Action Inbox</h3>
@@ -82,7 +88,11 @@ export function HealthPage() {
           )}
         </div>
         <button type="button" onClick={() => void controller.current?.check()}>
-          {state.status === "connected" ? "Check again" : "Retry connection"}
+          {state.status === "loading"
+            ? "Restart check"
+            : state.status === "connected"
+              ? "Check again"
+              : "Retry connection"}
         </button>
         <p className="hint">
           Health checks do not connect a Google account or change your data.

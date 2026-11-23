@@ -29,7 +29,16 @@ if (
 const apiPort = 3002;
 const webOrigin = "http://127.0.0.1:5174";
 const syntheticExtraction = process.env.SMOKE_EXTRACTION === "synthetic";
-const messages = Array.from({ length: 6 }, (_, index) => ({
+const messageCount = Number(process.env.SMOKE_MESSAGE_COUNT ?? 6);
+if (!Number.isInteger(messageCount) || messageCount < 1 || messageCount > 100) {
+  throw new Error("SMOKE_MESSAGE_COUNT must be an integer from 1 to 100");
+}
+const anchor = new Date();
+anchor.setUTCHours(0, 0, 0, 0);
+const demoDate = (days: number) =>
+  new Date(anchor.getTime() + days * 86_400_000).toISOString().slice(0, 10);
+const deadline = `${demoDate(3)}T17:00:00Z`;
+const messages = Array.from({ length: messageCount }, (_, index) => ({
   id: `smoke-message-${index + 1}`,
   threadId: `smoke-thread-${index + 1}`,
 }));
@@ -40,8 +49,8 @@ const events = new Map<string, Record<string, unknown>>([
     {
       id: "synthetic-all-day",
       summary: "Synthetic campus closure",
-      start: { date: "2026-10-09" },
-      end: { date: "2026-10-10" },
+      start: { date: demoDate(1) },
+      end: { date: demoDate(2) },
     },
   ],
   [
@@ -49,13 +58,12 @@ const events = new Map<string, Record<string, unknown>>([
     {
       id: "synthetic-timezone-event",
       summary: "Synthetic cross-timezone meeting",
-      start: { dateTime: "2026-10-09T09:00:00+09:00" },
-      end: { dateTime: "2026-10-09T10:00:00+09:00" },
+      start: { dateTime: `${demoDate(2)}T09:00:00+09:00` },
+      end: { dateTime: `${demoDate(2)}T10:00:00+09:00` },
     },
   ],
 ]);
-const message =
-  "Please submit registration documents by 2026-10-16T17:00:00-07:00.";
+const message = `Please submit registration documents by ${deadline}.`;
 let canvasMode: "original" | "changed" | "unavailable" = "original";
 const provider = await createGoogleTestProvider({
   email: "demo@example.test",
@@ -71,10 +79,14 @@ const provider = await createGoogleTestProvider({
           import.meta.url,
         ),
         "utf8",
-      ).replaceAll(
-        "https://canvas.example.invalid/",
-        "https://sofia.instructure.com/",
-      );
+      )
+        .replaceAll(
+          "https://canvas.example.invalid/",
+          "https://sofia.instructure.com/",
+        )
+        .replace(/202610(\d{2})(?=T|\r?$)/gm, (_match, day: string) =>
+          demoDate(Number(day) - 14).replaceAll("-", ""),
+        );
       return reply.type("text/calendar").send(body);
     });
     app.get("/gmail/v1/users/me/messages", async () => ({
@@ -84,7 +96,7 @@ const provider = await createGoogleTestProvider({
       "/gmail/v1/users/me/messages/:id",
       async (request) => {
         // Keep progress observable while importing actual synthetic provider data.
-        await delay(1200);
+        await delay(messageCount === 100 ? 0 : 1200);
         const index = messages.findIndex(({ id }) => id === request.params.id);
         return {
           ...messages[index],
@@ -162,8 +174,8 @@ const provider = await createGoogleTestProvider({
                   {
                     title: "Submit registration documents",
                     evidenceQuote: message,
-                    deadlineQuote: "2026-10-16T17:00:00-07:00",
-                    dueAt: "2026-10-16T17:00:00-07:00",
+                    deadlineQuote: deadline,
+                    dueAt: deadline,
                     deadlineCertainty: "Explicit",
                     confidence: 0.99,
                   },
@@ -204,6 +216,42 @@ const app = buildApp({
       );
     return parseCanvasFeed(await response.text());
   },
+});
+// Convenience entry for this loopback-only fixture process, not application auth.
+// It exercises the real session/state/PKCE callback instead of seeding a user.
+app.get("/__smoke/start", async (_request, reply) => {
+  const session = await app.inject({ method: "GET", url: "/v1/auth/session" });
+  const cookie = session.headers["set-cookie"];
+  if (session.statusCode !== 200 || !cookie) {
+    return reply
+      .code(500)
+      .send({ error: "Synthetic session bootstrap failed" });
+  }
+  const cookies = Array.isArray(cookie) ? cookie : [cookie];
+  const start = await app.inject({
+    method: "POST",
+    url: "/v1/auth/google/start",
+    headers: {
+      origin: webOrigin,
+      cookie: cookies.map((value) => value.split(";")[0]).join("; "),
+      "x-csrf-token": session.json<{ csrfToken: string }>().csrfToken,
+      "content-type": "application/json",
+    },
+    payload: "{}",
+  });
+  if (start.statusCode !== 200) {
+    return reply.code(500).send({ error: "Synthetic OAuth initiation failed" });
+  }
+  const destination = new URL(
+    start.json<{ authorizationUrl: string }>().authorizationUrl,
+  );
+  if (destination.origin !== provider.origin) {
+    return reply
+      .code(500)
+      .send({ error: "Expected the loopback fixture provider" });
+  }
+  reply.header("set-cookie", cookies);
+  return reply.redirect(destination.href);
 });
 // Test-only orchestration route: never registered by production server.ts.
 app.post<{ Body: { mode: string } }>(

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
   QueryClient,
   QueryClientProvider,
@@ -72,8 +72,29 @@ export function Application({
   const [emailId, setEmailId] = useState<string | null>(null);
   const [taskId, setTaskId] = useState<string | null>(null);
   const [createTask, setCreateTask] = useState(false);
+  const workspace = useRef<HTMLElement>(null);
+  const sourceReturn = useRef<string | null>(null);
+  function openEmail(id: string) {
+    sourceReturn.current = id;
+    setEmailId(id);
+  }
+  useLayoutEffect(() => {
+    if (emailId) {
+      workspace.current?.querySelector<HTMLElement>("h1")?.focus();
+    } else if (sourceReturn.current) {
+      const control = Array.from(
+        workspace.current?.querySelectorAll<HTMLElement>(
+          "[data-source-email]",
+        ) ?? [],
+      ).find((element) => element.dataset.sourceEmail === sourceReturn.current);
+      (control ?? workspace.current)?.focus();
+      sourceReturn.current = null;
+    }
+  }, [emailId]);
   const [generation, setGeneration] = useState(0);
-  const [outcome] = useState(() => callbackOutcome(window.location.search));
+  const [outcome, setOutcome] = useState(() =>
+    callbackOutcome(window.location.search),
+  );
   const session = useQuery({
     queryKey: ["session", generation],
     queryFn: ({ signal }) => api.session(signal),
@@ -224,12 +245,23 @@ export function Application({
           <HealthPage />
         ) : (
           <main
+            ref={workspace}
+            tabIndex={-1}
             className="workspace"
             key={`${generation}:${session.data?.user?.id ?? "anonymous"}`}
           >
             {outcome && (
-              <p className="inline-note" role="status">
-                {outcome}
+              <p className="inline-note callback-notice" role="status">
+                <span>{outcome}</span>
+                <button
+                  className="text-button"
+                  onClick={() => {
+                    setOutcome(null);
+                    workspace.current?.focus();
+                  }}
+                >
+                  Dismiss sign-in message
+                </button>
               </p>
             )}
             <ErrorNotice error={session.error} />
@@ -264,7 +296,7 @@ export function Application({
                       to import new sources. Your saved work stays here.
                     </p>
                   )}
-                  {emailId ? (
+                  {emailId && (
                     <>
                       <button
                         className="back-link text-button"
@@ -274,45 +306,48 @@ export function Application({
                       </button>
                       <EmailDetail api={api} id={emailId} />
                     </>
-                  ) : page === "Planner" ? (
-                    <Planner
-                      api={api}
-                      connected={session.data.googleConnected}
-                      openEmail={setEmailId}
-                      openTask={(id) => {
-                        setTaskId(id ?? null);
-                        setCreateTask(!id);
-                        setPage("Tasks");
-                      }}
-                      openInbox={() => setPage("Inbox")}
-                      openConnections={() => setPage("Connections")}
-                    />
-                  ) : page === "Inbox" ? (
-                    <Inbox
-                      api={api}
-                      connected={session.data.googleConnected}
-                      openEmail={setEmailId}
-                    />
-                  ) : page === "Tasks" ? (
-                    <Tasks
-                      key={taskId ?? (createTask ? "new" : "all")}
-                      api={api}
-                      connected={session.data.googleConnected}
-                      timezone={session.data.user!.timezone}
-                      openEmail={setEmailId}
-                      initialTaskId={taskId}
-                      createInitially={createTask}
-                    />
-                  ) : page === "Calendar" ? (
-                    <Calendar api={api} />
-                  ) : (
-                    <Account
-                      api={api}
-                      session={session.data}
-                      clearPrivateData={clearPrivateData}
-                      navigate={navigate}
-                    />
                   )}
+                  <div hidden={emailId !== null}>
+                    {page === "Planner" ? (
+                      <Planner
+                        api={api}
+                        connected={session.data.googleConnected}
+                        openEmail={openEmail}
+                        openTask={(id) => {
+                          setTaskId(id ?? null);
+                          setCreateTask(!id);
+                          setPage("Tasks");
+                        }}
+                        openInbox={() => setPage("Inbox")}
+                        openConnections={() => setPage("Connections")}
+                      />
+                    ) : page === "Inbox" ? (
+                      <Inbox
+                        api={api}
+                        connected={session.data.googleConnected}
+                        openEmail={openEmail}
+                      />
+                    ) : page === "Tasks" ? (
+                      <Tasks
+                        key={taskId ?? (createTask ? "new" : "all")}
+                        api={api}
+                        connected={session.data.googleConnected}
+                        timezone={session.data.user!.timezone}
+                        openEmail={openEmail}
+                        initialTaskId={taskId}
+                        createInitially={createTask}
+                      />
+                    ) : page === "Calendar" ? (
+                      <Calendar api={api} />
+                    ) : (
+                      <Account
+                        api={api}
+                        session={session.data}
+                        clearPrivateData={clearPrivateData}
+                        navigate={navigate}
+                      />
+                    )}
+                  </div>
                 </DisplayWindowProvider>
               ))}
           </main>
@@ -325,9 +360,11 @@ export function Application({
 function ConnectGoogle({
   api,
   navigate,
+  connected = false,
 }: {
   api: ApiClient;
   navigate: (url: string) => void;
+  connected?: boolean;
 }) {
   const action = useAction();
   return (
@@ -345,9 +382,12 @@ function ConnectGoogle({
           }, "Opening Google authorization…")
         }
       >
-        Connect Google account
+        {connected ? "Reconnect Google account" : "Connect Google account"}
       </button>
-      <ActionNotice action={action} />
+      <ActionNotice
+        action={action}
+        pendingMessage="Requesting Google authorization…"
+      />
     </>
   );
 }
@@ -413,19 +453,18 @@ function Account({
       "Delete all account data? This revokes Google access and permanently deletes your retained account data. This cannot be undone.",
   };
   return (
-    <section>
-      <div className="page-heading">
+    <section className="page-connections">
+      <div className="page-heading connections-heading">
         <div>
           <p className="eyebrow">Sources and permissions</p>
           <h1>Connections</h1>
           <p className="subtitle">
-            Connect once. Keep sources, interpretation, and external actions
-            distinct.
+            Manage source access, import status, and retained account data.
           </p>
         </div>
       </div>
       <div className="connection-grid">
-        <article className="surface connection-card">
+        <article className="surface connection-card google-connection">
           <span
             className={`pill ${session.googleConnected ? "soon" : "neutral"}`}
           >
@@ -433,7 +472,11 @@ function Account({
           </span>
           <h2>Google account</h2>
           <p>{session.user?.email}</p>
-          <ConnectGoogle api={api} navigate={navigate} />
+          <ConnectGoogle
+            api={api}
+            navigate={navigate}
+            connected={session.googleConnected}
+          />
           <ul className="capability-list">
             <li>
               <strong>Gmail · read-only source</strong>Recent messages import
@@ -447,8 +490,11 @@ function Account({
             </li>
           </ul>
         </article>
-        <article className="surface connection-card">
-          <span className={`pill ${unconfigured ? "neutral" : "review"}`}>
+        <article className="surface connection-card interpretation-connection">
+          <span
+            className={`pill ${unconfigured ? "neutral" : "review"}`}
+            role="status"
+          >
             {unconfigured
               ? "Interpretation unavailable"
               : lastRun?.status === "Running" || lastRun?.status === "Queued"
@@ -457,12 +503,14 @@ function Account({
                   ? "Last run completed"
                   : lastRun
                     ? "Last run needs attention"
-                    : "Not yet checked"}
+                    : interpretation.isFetching
+                      ? "Checking status"
+                      : "Not yet checked"}
           </span>
           <h2>Automatic suggestions</h2>
           <p>
             {unconfigured
-              ? "Your Google connection succeeded. The extraction provider is not configured; no AI dates or actions are being invented. Read imported messages or create manual tasks."
+              ? "The last import reported that extraction was not configured; no AI dates or actions were invented. Read imported messages or create manual tasks."
               : "Source connection and interpretation are separate. Extracted actions and dates remain proposals until you review their evidence."}
           </p>
           {lastRun && (
@@ -476,7 +524,9 @@ function Account({
             disabled={interpretation.isFetching}
             onClick={() => void interpretation.refetch()}
           >
-            Refresh connection status
+            {interpretation.isFetching
+              ? "Checking connection…"
+              : "Refresh connection status"}
           </button>
           <ErrorNotice error={interpretation.error} />
           {lastRun?.error && (
@@ -497,66 +547,79 @@ function Account({
         </article>
         <CanvasConnectionCard api={api} />
       </div>
-      <h2>Browser session and retained data</h2>
-      <p>
-        These actions require confirmation. Private client data is cleared after
-        the server confirms success; a failure remains visible for retry.
-      </p>
-      <div className="actions">
-        <button
-          onClick={() => setConfirmation("logout")}
-          disabled={action.pending}
-        >
-          Log out
-        </button>
-        <button
-          onClick={() => setConfirmation("disconnect")}
-          disabled={action.pending}
-        >
-          Disconnect Google
-        </button>
-        <button
-          onClick={() => setConfirmation("delete")}
-          disabled={action.pending}
-        >
-          Delete account data
-        </button>
-      </div>
-      {confirmation && (
-        <section className="confirmation" aria-label="Confirm account action">
-          <h3>{descriptions[confirmation]}</h3>
-          <div className="actions">
-            <button
-              disabled={action.pending}
-              onClick={() =>
-                void action.run(async () => {
-                  const path =
-                    confirmation === "logout"
-                      ? apiRoutes.logout
-                      : confirmation === "disconnect"
-                        ? apiRoutes.disconnect
-                        : apiRoutes.deleteData;
-                  await api.request(path, successResponseSchema, {
-                    method: confirmation === "delete" ? "DELETE" : "POST",
-                    ...(confirmation === "delete" ? {} : { body: {} }),
-                  });
-                  await clearPrivateData();
-                })
-              }
-            >
-              Confirm{" "}
-              {confirmation === "delete" ? "permanent deletion" : confirmation}
-            </button>
-            <button
-              disabled={action.pending}
-              onClick={() => setConfirmation(null)}
-            >
-              Keep my account unchanged
-            </button>
-          </div>
-        </section>
-      )}
-      <ActionNotice action={action} />
+      <section
+        className="account-controls"
+        aria-labelledby="account-controls-heading"
+      >
+        <h2 id="account-controls-heading">Browser session and retained data</h2>
+        <p>
+          These actions require confirmation. Private client data is cleared
+          after the server confirms success; a failure remains visible for
+          retry.
+        </p>
+        <div className="actions">
+          <button
+            onClick={() => setConfirmation("logout")}
+            disabled={action.pending}
+          >
+            Log out
+          </button>
+          <button
+            className="secondary"
+            onClick={() => setConfirmation("disconnect")}
+            disabled={action.pending}
+          >
+            Disconnect Google
+          </button>
+          <button
+            className="secondary danger"
+            onClick={() => setConfirmation("delete")}
+            disabled={action.pending}
+          >
+            Delete account data
+          </button>
+        </div>
+        {confirmation && (
+          <section className="confirmation" aria-label="Confirm account action">
+            <h3>{descriptions[confirmation]}</h3>
+            <div className="actions">
+              <button
+                disabled={action.pending}
+                onClick={() =>
+                  void action.run(async () => {
+                    const path =
+                      confirmation === "logout"
+                        ? apiRoutes.logout
+                        : confirmation === "disconnect"
+                          ? apiRoutes.disconnect
+                          : apiRoutes.deleteData;
+                    await api.request(path, successResponseSchema, {
+                      method: confirmation === "delete" ? "DELETE" : "POST",
+                      ...(confirmation === "delete" ? {} : { body: {} }),
+                    });
+                    await clearPrivateData();
+                  })
+                }
+              >
+                Confirm{" "}
+                {confirmation === "delete"
+                  ? "permanent deletion"
+                  : confirmation}
+              </button>
+              <button
+                disabled={action.pending}
+                onClick={() => setConfirmation(null)}
+              >
+                Keep my account unchanged
+              </button>
+            </div>
+          </section>
+        )}
+        <ActionNotice
+          action={action}
+          pendingMessage="Applying your confirmed account action…"
+        />
+      </section>
     </section>
   );
 }

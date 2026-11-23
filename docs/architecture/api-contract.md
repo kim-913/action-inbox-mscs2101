@@ -8,6 +8,8 @@ Use `credentials: "include"` for every request. Call `GET /v1/auth/session` befo
 
 OAuth callback outcome is `?auth=connected`, `?auth=denied`, or `?auth=failed`, never a provider message or credential.
 
+Credential encryption explicitly requires a 16-byte AES-GCM authentication tag. This hardens validation without changing the existing encrypted envelope or requiring key rotation/migration. Session, OAuth state, exact Origin and CSRF protections remain unchanged.
+
 ## Endpoints
 
 | Method and route                         | Request                                                     | Successful response                                                                              |
@@ -43,9 +45,11 @@ OAuth callback outcome is `?auth=connected`, `?auth=denied`, or `?auth=failed`, 
 
 Calendar creation additionally uses a durable task-owned intent. After reload, an identical event-content retry can use a replacement client UUID and still reconciles the original Google event ID; changed content returns conflict. This prevents a lost in-memory request key from forcing a second external event.
 
+Upcoming Calendar reads capture the original Google connection ID before provider network work. Both successful snapshot replacement and provider-failure error persistence recheck that identity under the user-row lock. A stale disconnect/reconnect lifecycle returns HTTP 401 `GOOGLE_RECONNECT_REQUIRED` and changes neither snapshot nor stored error. Provider network work never runs under the database lock.
+
 `POST /v1/sync/gmail` retries failed extractions for already persisted emails without overwriting approved/rejected decisions. Failed extraction sets the email's `extractionError` and prevents the containing run from reporting `Succeeded`; last successful data remains readable. Action and explicit-deadline support use separate `evidence` and `deadlineEvidence` fields.
 
-Reminder storage is not delivery: `delivery: "Not configured"` is mandatory. These endpoints manage only explicitly labelled in-app due metadata. The UI must not offer a control claiming a notification was scheduled, or report reminder success without a delivery mechanism. AC-09 remains incomplete and pending the user's delivery decision. No notification permission, email, push, or background delivery is implied.
+Reminder storage is not delivery: `delivery: "Not configured"` is mandatory. These endpoints create, edit and cancel persistent in-app due metadata for owned approved/manual tasks. The November 22 delegated finalization decision makes this metadata-only AC-09, aligned with SRS v2.0 FR17 and the submitted STP. The UI may report metadata saved/cancelled, never notification scheduled/delivered. No notification permission, email, push or background delivery is implied; delivery is outside this release.
 
 ## Shared display window and source filtering
 

@@ -74,6 +74,145 @@ const task: Task = {
 afterEach(cleanup);
 
 describe("planner interactions", () => {
+  it("keeps a 100-message plan bounded while exposing every loaded source and agenda item", async () => {
+    const emails = Array.from({ length: 100 }, (_, index) => ({
+      ...email,
+      id: `10000000-0000-4000-8000-${String(index + 1).padStart(12, "0")}`,
+      gmailMessageId: `synthetic-${index}`,
+      subject: `Synthetic email ${index + 1}`,
+      suggestions: [],
+    }));
+    const tasks = Array.from({ length: 100 }, (_, index) => ({
+      ...task,
+      id: `20000000-0000-4000-8000-${String(index + 1).padStart(12, "0")}`,
+      title: `Synthetic task ${index + 1}`,
+      dueAt: index % 2 ? null : due,
+    }));
+    const fetcher = vi.fn<typeof fetch>().mockImplementation(async (input) => {
+      const url = new URL(String(input));
+      if (url.pathname === "/v1/inbox")
+        return Response.json({
+          items: url.searchParams.get("dateField") === "received" ? emails : [],
+          nextCursor: null,
+          dataState: { lastSuccessfulSyncAt: timestamp, latestSyncRun: null },
+        });
+      if (url.pathname === "/v1/tasks")
+        return Response.json({ items: tasks, nextCursor: null });
+      if (url.pathname === "/v1/canvas/connection")
+        return Response.json(canvasDisconnected);
+      if (url.pathname === "/v1/calendar/upcoming")
+        return Response.json({
+          items: [],
+          lastSuccessfulFetchAt: timestamp,
+          error: null,
+        });
+      throw new Error(`Unexpected fixture request ${url.pathname}`);
+    });
+    const cache = new QueryClient({
+      defaultOptions: { queries: { retry: false, gcTime: 0 } },
+    });
+    const openEmail = vi.fn();
+    render(
+      <QueryClientProvider client={cache}>
+        <Planner
+          api={new ApiClient("http://localhost:3000", fetcher)}
+          connected
+          openEmail={openEmail}
+          openTask={vi.fn()}
+          openInbox={vi.fn()}
+          openConnections={vi.fn()}
+        />
+      </QueryClientProvider>,
+    );
+    await screen.findByText("Synthetic task 2");
+    const expand = await screen.findByRole("button", {
+      name: "Show all loaded emails",
+    });
+    const sources = screen.getByRole("region", {
+      name: "Loaded recent emails",
+    });
+    expect(within(sources).getAllByRole("button")).toHaveLength(5);
+    const requests = fetcher.mock.calls.length;
+    fireEvent.click(expand);
+    const sourceButtons = within(sources).getAllByRole("button");
+    expect(sourceButtons).toHaveLength(100);
+    fireEvent.click(sourceButtons[99]!);
+    expect(openEmail).toHaveBeenCalledWith(emails[99]!.id);
+    expect(fetcher).toHaveBeenCalledTimes(requests);
+    fireEvent.click(
+      screen.getByRole("button", { name: "Show recent email preview" }),
+    );
+    expect(within(sources).getAllByRole("button")).toHaveLength(5);
+    for (const name of [
+      "Selected day items",
+      "Upcoming loaded items",
+      "Undated loaded items",
+    ]) {
+      const region = screen.getByRole("region", { name });
+      expect(region.getAttribute("tabindex")).toBe("0");
+      expect(within(region).getAllByRole("heading", { level: 3 })).toHaveLength(
+        50,
+      );
+    }
+    expect(fetcher.mock.calls.every((call) => call[1]?.method === "GET")).toBe(
+      true,
+    );
+  });
+
+  it("ends initial loading on a source failure and retries without discarding successful work", async () => {
+    let calendarUnavailable = true;
+    const fetcher = vi.fn<typeof fetch>().mockImplementation(async (url) => {
+      const path = new URL(String(url)).pathname;
+      if (path === "/v1/inbox")
+        return Response.json({
+          items: [],
+          nextCursor: null,
+          dataState: { lastSuccessfulSyncAt: timestamp, latestSyncRun: null },
+        });
+      if (path === "/v1/tasks")
+        return Response.json({ items: [task], nextCursor: null });
+      if (path === "/v1/canvas/connection")
+        return Response.json(canvasDisconnected);
+      if (path === "/v1/calendar/upcoming") {
+        if (calendarUnavailable)
+          return Response.json({ message: "Unavailable" }, { status: 503 });
+        return Response.json({
+          items: [],
+          lastSuccessfulFetchAt: timestamp,
+          error: null,
+        });
+      }
+      throw new Error(`Unexpected fixture request ${path}`);
+    });
+    const cache = new QueryClient({
+      defaultOptions: { queries: { retry: false, gcTime: 0 } },
+    });
+    render(
+      <QueryClientProvider client={cache}>
+        <Planner
+          api={new ApiClient("http://localhost:3000", fetcher)}
+          connected
+          openEmail={vi.fn()}
+          openTask={vi.fn()}
+          openInbox={vi.fn()}
+          openConnections={vi.fn()}
+        />
+      </QueryClientProvider>,
+    );
+    await screen.findByRole("alert");
+    await screen.findByText(task.title);
+    expect(screen.queryByText("Loading your saved plan…")).toBeNull();
+    expect(screen.queryByText(/All returned pages are loaded/)).toBeNull();
+    calendarUnavailable = false;
+    fireEvent.click(screen.getByRole("button", { name: "Refresh plan" }));
+    await waitFor(() => expect(screen.queryByRole("alert")).toBeNull());
+    await screen.findByText(/All returned pages are loaded/);
+    expect(screen.getByText(task.title)).toBeTruthy();
+    expect(fetcher.mock.calls.every((call) => call[1]?.method === "GET")).toBe(
+      true,
+    );
+  });
+
   it("opens evidence and task details, separates undated work, and excludes completed tasks", async () => {
     const fetcher = vi.fn<typeof fetch>().mockImplementation(async (url) => {
       const path = new URL(String(url)).pathname;
@@ -407,11 +546,14 @@ describe("planner interactions", () => {
       }),
     ).toHaveLength(2);
     const todayCell = screen.getByRole("button", {
-      name: `${new Date().toLocaleDateString(undefined, {
-        weekday: "long",
-        month: "long",
-        day: "numeric",
-      })}, 1 loaded items`,
+      name: (name) =>
+        name.startsWith(
+          new Date().toLocaleDateString(undefined, {
+            weekday: "long",
+            month: "long",
+            day: "numeric",
+          }) + ", ",
+        ),
     });
     expect(
       within(todayCell).getByText("Overlapping linked Calendar event"),

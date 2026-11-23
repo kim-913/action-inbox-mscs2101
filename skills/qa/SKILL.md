@@ -22,7 +22,7 @@ Paths below are relative to the repository root unless linked.
 
 Capture the change/revision under review, requirement and AC IDs, intended user-visible result, test scope, environment ownership, synthetic fixture version, designated browser/device/timezone, evidence destination, and execution authority. If a central integration owner runs verification, provide the test plan and review evidence rather than launching competing checks.
 
-Resolve facts from repository evidence first. Escalate only missing acceptance decisions or authorization: real approved test accounts, paid-model usage, reminder-delivery criteria, deployment/device choice, or destructive operations. Do not ask for private messages, credentials, or secret feed URLs. A user-reported defect is valid input; do not rerun a private operation to confirm it.
+Resolve facts from repository evidence first. Escalate only missing acceptance decisions or authorization: real approved test accounts, paid-model usage, future notification channels, deployment/device choice, or destructive operations. AC-09 is already metadata-only under the November 22 delegated finalization decision, aligned with SRS v2.0 FR17 and the submitted STP; do not reopen a P0 delivery-mechanism blocker. Do not ask for private messages, credentials, or secret feed URLs. A user-reported defect is valid input; do not rerun a private operation to confirm it.
 
 ## Responsibilities and non-goals
 
@@ -47,13 +47,17 @@ The public repository has enforced `main` protection, including for administrato
 
 Root check entry points are `npm run typecheck`, `npm test`, `npm run lint`, and `npm run format:check`. A focused API run can use `npm run test --workspace @action-inbox/api -- src/pipeline/extractor.test.ts`; select an existing file appropriate to the change. Run only when assigned to execute. Full environment and smoke commands belong in [CONTRIBUTING.md](../../CONTRIBUTING.md), not a second setup recipe here.
 
+The security gate is `python3 scripts/security-gate.py`: pinned Semgrep 1.186.0 with seven local rules, checksum-pinned Gitleaks 8.30.1 and npm audit with zero vulnerabilities at all severities. Positive controls and scanner/report/parse errors fail closed. Only two exact public-prose false positives are dispositioned, expiring 2026-12-31; use [security review](../../docs/security/local-review.md), not blanket exclusions.
+
 ## Workflow
 
 1. **Map coverage.** For each affected requirement, write preconditions, synthetic inputs, user actions, expected visible outcome, persistence/external-effect assertion where relevant, and test level. Include both success and failure/recovery. Keep observed, inferred, user-reported, and not-tested claims distinct.
 2. **Prepare isolation.** Use a separately owned disposable PostgreSQL instance, conventionally loopback 55433. Use `action_inbox_test` for integration tests and `action_inbox_smoke` for browser fixtures; never point `TEST_DATABASE_URL` at the persistent preview database on 55432. Unlike the smoke harness guard, a test suite should not be assumed to reject a dangerous target automatically. Record only sanitized host/port/database metadata, never its password or full connection URL.
 3. **Coordinate execution.** One integration owner schedules checks after edits land. If execution is not assigned, stop at the runnable plan and handoff, not at a fabricated result. For an authorized run, record exact command, revision, environment, pass/fail/skip counts and evidence. Unavailable prerequisites are blocked coverage, not passing tests.
 4. **Exercise the actual boundary.** Synthetic smoke uses API 3002 and browser 5174, a dedicated clean browser profile, and a separate build output directory. Preserve the live 3000/5173 services and `apps/web/dist`. `npm run smoke:local-providers` defaults to disabled extraction; `SMOKE_EXTRACTION=synthetic` explicitly selects a loopback synthetic response, never paid AI. The harness has no browser assertions by itself; document the actual browser actions separately. Follow CONTRIBUTING for its OAuth test orchestration without weakening the production Google redirect allowlist.
+   Use `/__smoke/start` on 3002 in the separate profile to exercise real synthetic OAuth state/callback handling and return to 5174. Optional `SMOKE_MESSAGE_COUNT=100` supports performance; default is six delayed messages. Harness dates are current-relative; fixture files stay static. Follow CONTRIBUTING's production-build rehearsal and smoke-only reset, preserving the test database.
 5. **Test affected invariants.** As applicable, cover approval before task/event creation, three identical syncs, Calendar retry/lost response, cross-user access, source quotations, uncertain/date-only/timezone handling, last-success retention, partial pagination, and disabled extraction with readable imports. Canvas refresh/disconnect tests must preserve independent Google/Canvas lifecycles and must not infer completion from feed disappearance. Notification metadata is not delivered notification evidence.
+   Calendar upcoming success and failure persistence must fence the original pre-network connection ID under the user lock; stale lifecycle work returns 401 `GOOGLE_RECONNECT_REQUIRED` without snapshot/error mutations, and network work never holds a DB lock. Explicit 16-byte GCM tag enforcement preserves the existing envelope.
 6. **Report and retest.** File the smallest synthetic reproducer, severity and release effect. A fixed S0–S2 defect needs a regression demonstrating the consumer-visible failure and correction. Preserve prior failure evidence; add the correction result only when actually observed.
 7. **Assess acceptance.** Map each AC to evidence plus remaining gaps. Obtain non-author review for course evidence where required; request optional technical peer review when useful without making it a PR merge gate. PM owns approved scope changes; QA must not relabel blocked work as complete to meet a date.
 
@@ -68,16 +72,16 @@ Use the execution plan's incident scale, not P0/P1 feature priority as a substit
 | S2       | P0 behavior incorrect with a documented workaround                                  | Fix or explicitly de-scope before feature freeze; no open S2 at release.                     |
 | S3       | P1 defect or minor usability/accessibility issue                                    | May defer with an owner and rationale.                                                       |
 
-Release also requires evidence for all P0 criteria, repeated-sync/retry duplicate prevention, AC-10 thresholds on frozen data, exercised revocation/deletion, the actual build's primary scenario, a resolved reminder-delivery criterion, and truthful course artifacts. Do not infer those gates from green unit tests.
+Release also requires evidence for all P0 criteria, repeated-sync/retry duplicate prevention, AC-10 thresholds on frozen data, exercised revocation/deletion, the actual build's primary scenario, persistent create/edit/cancel reminder metadata with no-delivery labels (AC-09), and truthful course artifacts. Notification delivery is outside this release. Do not infer acceptance from green unit tests.
 
 ## Known acceptance limits to carry forward
 
 Consult current evidence before changing status. Existing recorded user success with Google sign-in/import and Canvas import is not an agent inspection, four-user/deployed Google acceptance, or full Canvas OAuth. Keep these unresolved unless new authorized evidence or an explicit approved acceptance change resolves them:
 
 - AC-01: all four approved Google users and deployed callback/reconnection acceptance.
-- AC-09: reminder metadata exists; browser-closed notification delivery needs a separately approved mechanism or replacement criterion and observed result.
+- AC-09: verify create/edit/cancel persistence for owned approved/manual tasks and clear no-delivery labels. The scope decision does not itself prove every workflow step; notification channels remain future work, not a P0 delivery blocker.
 - AC-10: approved real-model evaluation on the versioned 50-message set; action-required recall and explicit-deadline precision must each meet 90%. Offline fixture arithmetic is insufficient.
-- AC-13: designated browser/device with 100 synchronized messages, interactive within two seconds after API data is available. A responsive screenshot or task pagination test is insufficient.
+- AC-13: the current local production build passed the retained ten-run, 100-message protocol with normal motion. See the exact current timings, build, device, cache policy, trace and limits in the evidence index. Re-run on relevant build/device changes; a responsive screenshot or task pagination test remains insufficient.
 - Remaining live-provider retry/resilience, deployment/security review, final-device rehearsal, and AC-14 final-report traceability/non-author review, as tracked in the evidence documents.
 
 Full Outlook/Canvas OAuth, private coursework/submission state, and notification channels remain broader roadmap work; the limited read-only Canvas feed must not be presented as satisfying them.

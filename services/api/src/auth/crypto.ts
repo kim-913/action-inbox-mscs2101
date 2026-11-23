@@ -41,7 +41,9 @@ export class TokenCipher {
   encrypt(value: string, identity: string, purpose: string): string {
     if (!value) throw new Error("Cannot encrypt an empty credential.");
     const iv = randomBytes(12);
-    const cipher = createCipheriv("aes-256-gcm", this.key, iv);
+    const cipher = createCipheriv("aes-256-gcm", this.key, iv, {
+      authTagLength: 16,
+    });
     cipher.setAAD(Buffer.from(JSON.stringify(["v1", identity, purpose])));
     const ciphertext = Buffer.concat([
       cipher.update(value, "utf8"),
@@ -66,7 +68,9 @@ export class TokenCipher {
     const tag = Buffer.from(parts[2]!, "base64url");
     const ciphertext = Buffer.from(parts[3]!, "base64url");
     try {
-      const decipher = createDecipheriv("aes-256-gcm", this.key, iv);
+      const decipher = createDecipheriv("aes-256-gcm", this.key, iv, {
+        authTagLength: 16,
+      });
       decipher.setAAD(Buffer.from(JSON.stringify(["v1", identity, purpose])));
       decipher.setAuthTag(tag);
       return Buffer.concat([

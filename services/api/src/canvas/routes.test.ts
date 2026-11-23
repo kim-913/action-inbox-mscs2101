@@ -27,7 +27,7 @@ import { migrate } from "../db/migrate.js";
 import { registerAccount } from "../domain/account.js";
 import { ApiFailure, type ServerConfig } from "../runtime.js";
 import { registerCanvas } from "./index.js";
-import type { CanvasFeedReader } from "./feed.js";
+import { parseCanvasFeed, type CanvasFeedReader } from "./feed.js";
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
 const feedUrl =
@@ -580,6 +580,66 @@ describe.skipIf(!databaseUrl)(
       expect(reader).not.toHaveBeenCalled();
       expect((await connection()).status).toBe("Ready");
       expect((await items(other)).items).toEqual([item("a"), item("b")]);
+    });
+
+    it("imports all 1000 events and retains that snapshot after 1001-event or truncated refreshes", async () => {
+      const feed = (count: number) =>
+        [
+          "BEGIN:VCALENDAR",
+          "VERSION:2.0",
+          "PRODID:-//Synthetic boundary//EN",
+          ...Array.from({ length: count }, (_, index) =>
+            [
+              "BEGIN:VEVENT",
+              `UID:event-calendar-event-${index}`,
+              `SUMMARY:Boundary event ${index}`,
+              "DTSTART:20261008T120000Z",
+              "END:VEVENT",
+            ].join("\r\n"),
+          ),
+          "END:VCALENDAR",
+          "",
+        ].join("\r\n");
+      let source = feed(1000);
+      const expected = parseCanvasFeed(source).sort((a, b) =>
+        a.id.localeCompare(b.id),
+      );
+      reader.mockImplementation(async () => parseCanvasFeed(source));
+      expect((await connect()).statusCode).toBe(200);
+      const before = await connection();
+      const collect = async () => {
+        const collected: CanvasItem[] = [];
+        let cursor: string | null = null;
+        do {
+          const page = await items(
+            own,
+            `?limit=100${cursor ? `&cursor=${cursor}` : ""}`,
+          );
+          collected.push(...page.items);
+          cursor = page.nextCursor;
+        } while (cursor);
+        return collected;
+      };
+      expect(await collect()).toEqual(expected);
+      expect((await items(other)).items).toEqual([]);
+      for (source of [feed(1001), feed(1000).replace("END:VCALENDAR", "")]) {
+        expect((await refresh()).statusCode).toBe(200);
+        const failed = await connection();
+        expect(failed).toMatchObject({
+          status: "Failed",
+          itemCount: 1000,
+          lastSuccessfulFetchAt: before.lastSuccessfulFetchAt,
+          error: { code: "CANVAS_FEED_INVALID" },
+        });
+        expect(await collect()).toEqual(expected);
+      }
+      expect(
+        (
+          await pool.query("SELECT id FROM tasks WHERE user_id=$1", [
+            own.userId,
+          ])
+        ).rowCount,
+      ).toBe(0);
     });
 
     it("bounds keyset pages and rejects invalid, foreign and stale snapshot cursors", async () => {

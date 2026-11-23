@@ -1,9 +1,11 @@
 # Action Inbox — Project Execution Plan
 
-Status: local web P0 implementation candidate; connected-planner direction approved 2026-10-07. One user's real Google sign-in/import is reported; all-user/deployment acceptance, approved paid-model evaluation, and reminder-delivery decision remain open.
+Status: local web P0 finalization candidate. On 2026-11-22 the user delegated finalization scope decisions; AC-09 is metadata-only, aligned with SRS v2.0 FR17 and the submitted STP. One user's real Google sign-in/import is reported; four-user/deployment acceptance, approved real-model evaluation, hosted HTTPS and non-developer rehearsal evidence remain open.
 Course: MSCS2101-1 Software Engineering, Fall 2026  
 Team: four members; Member 1 is the primary software engineer  
 Target: browser-first course MVP and live demonstration on December 5, 2026
+
+Current checkpoint evidence: the central Node 22.23.5/PostgreSQL 16 run passed **381 tests** (102 web, 261 API, 18 contracts), with zero skips; typechecking, lint and the isolated production build passed. Actual synthetic browser actions exercised 100-message import, source/edit/approve, waiting/completed states, reminder create/cancel, one separately confirmed Calendar event, manual undated work, saved-window persistence, and Canvas four-item outage retention/recovery with one actionable error. See [P0 evidence](docs/testing/p0-evidence.md) for scope, screenshots and timings; do not extrapolate independent approval.
 
 ## 1. Operating constraints
 
@@ -26,7 +28,7 @@ Action Inbox is a source-linked connected planner. Consented imports feed an int
 
 A user connects an available source, receives a bounded automatic import after consent, and sees supported dated items alongside a clearly labelled undated/review list. Proposed actions, approved/manual tasks, and existing external Calendar events stay distinct; event start times and message receipt times are not inferred deadlines. Due urgency is a transparent date comparison, not AI confidence or a claim about personal importance.
 
-Gmail and Google Calendar are the only currently configured provider capabilities, using the same Google connection. Outlook and Canvas are approved Phase 2 roadmap goals, not implemented or available connectors; official API permissions and missing setup prerequisites are in `docs/testing/connector-prerequisites.md`. Do not add pretend connection controls. Native structured assignment deadlines can eventually bypass AI, while unstructured Gmail action/deadline extraction still needs a configured, explicitly authorized extractor.
+Gmail and Google Calendar share the Google connection. A separate read-only Sofia Canvas calendar subscription is implemented; full Canvas OAuth and Outlook remain roadmap goals. Official API permissions and missing setup prerequisites are in `docs/testing/connector-prerequisites.md`. Do not add pretend connection controls. Native Canvas dates bypass AI; unstructured Gmail action/deadline extraction still needs a configured, explicitly authorized extractor.
 
 The local application keeps AI API extraction disabled. Imported messages remain readable, but import alone does not classify them or invent actions/dates. The separate one-case ChatGPT website experiment is neither a backend integration nor a schema/accuracy acceptance pass.
 
@@ -53,7 +55,7 @@ The local application keeps AI API extraction disabled. Imported messages remain
 - Internal planner display may show proposed suggestions automatically. Review, edit, approve, and reject remain required before suggestion-to-task conversion; external Calendar creation always needs separate explicit confirmation.
 - Internal tasks with `Pending`, `Waiting for Reply`, and `Completed` states.
 - Manual task and reminder creation.
-- Reminder creation, editing, and cancellation metadata remain required. Delivery while the browser is closed is pending an explicit product decision; local Expo notifications are no longer an applicable implementation.
+- Reminder creation, editing and cancellation are persistent metadata-only operations for owned approved/manual tasks, visibly labelled as no delivery. Notification delivery, including browser-closed delivery, is outside this release.
 - Upcoming Google Calendar event display and user-approved event creation.
 - Source-email linkage for every extracted task.
 - Idempotent synchronization and duplicate prevention for messages, suggestions, tasks, and events.
@@ -78,13 +80,13 @@ The user approved gradually extending the internal, Google-Calendar-like planner
 3. Add explicitly opted-in notification choices, including reminders one or two days before assignments and appropriate immediate/time-sensitive alerts. Define permissions, browser-closed delivery, timezone changes, deduplication, cancellation, and observed delivery before claiming success.
 4. Evaluate SMS as an optional separately approved channel. This roadmap does not authorize a paid SMS account, phone-number collection, sending a message, provider registration, or spending. No enabled-looking SMS/notification controls should appear before real delivery exists.
 
-These goals do not silently pass or replace P0 AC-09: the existing reminder-delivery release criterion remains unresolved until its mechanism or replacement acceptance criterion is explicitly approved and verified. Current reminder controls store metadata only.
+The November 22 delegated finalization decision defines P0 AC-09 as metadata-only, matching SRS v2.0 FR17 and the submitted STP. It does not authorize or claim notification delivery; future channels retain separate permission, cost and observed-delivery requirements.
 
 #### Approved Canvas calendar-only increment
 
 After confirming Sofia Canvas exposes Calendar Feed, the user explicitly chose an ongoing read-only calendar subscription as the first Canvas connection. This is not a substitute claim for full Canvas OAuth: private course, grade, submission and completion APIs still require future setup/consent. The implementation accepts the secret link only through authenticated app input, encrypts it server-side, imports native assignment due/event dates without AI, and supports initial/manual refresh with source-specific paging and last-success retention. After the identified-client transport correction was deployed, the user reported their real feed import working; no private item count/content was inspected to reconfirm it. See `docs/testing/canvas-subscription-evidence.md`.
 
-No imported item automatically creates an approved task, writes an external calendar, or delivers a notification. Date-only assignment feeds cannot establish an exact due clock time. The source has bounded date coverage; the app rejects more than 1,000 events instead of silently truncating. Disappearance from a snapshot is not completion. Full Outlook/Canvas OAuth and reminder channels remain planned, and AC-09 remains unchanged.
+No imported item automatically creates an approved task, writes an external calendar, or delivers a notification. Date-only assignment feeds cannot establish an exact due clock time. The source has bounded date coverage; the app rejects more than 1,000 events instead of silently truncating. Disappearance from a snapshot is not completion. Full Outlook/Canvas OAuth and notification channels remain planned, outside metadata-only AC-09.
 
 ### Explicitly deferred
 
@@ -103,42 +105,42 @@ If schedule pressure occurs, cut P1 first. Do not weaken approval, evidence, dup
 
 ## 4. Measurable acceptance criteria
 
-| ID    | Requirement                           | Acceptance evidence                                                                                                                                                                              |
-| ----- | ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| AC-01 | Account connection                    | Each of the four approved test users can complete OAuth and reconnect after an expired access token.                                                                                             |
-| AC-02 | Gmail synchronization                 | A run imports up to 100 messages from the configured 14-day window and records success or an actionable error.                                                                                   |
-| AC-03 | Idempotency                           | Running the same synchronization three times produces one stored email and at most one active suggestion per extracted action.                                                                   |
-| AC-04 | Human approval                        | No task or Google Calendar event is created before an explicit approval action.                                                                                                                  |
-| AC-05 | Evidence                              | Every AI-derived action or deadline displays a quotation that is verified as part of the normalized source body.                                                                                 |
-| AC-06 | Deadline safety                       | An uncertain or unsupported deadline is flagged for review rather than silently treated as exact.                                                                                                |
-| AC-07 | Task lifecycle                        | A user can create, edit, reject, approve, complete, and mark a task as waiting for reply.                                                                                                        |
-| AC-08 | Calendar creation                     | An approved event is created once, stores the Google event ID, and is not duplicated after retry.                                                                                                |
-| AC-09 | Reminders (delivery decision pending) | A user can create and cancel reminder metadata for an approved task. The replaced native-notification criterion is not complete; browser-closed delivery requires a separate approved mechanism. |
-| AC-10 | Accuracy                              | On a versioned, anonymized 50-message evaluation set: action-required recall is at least 90%, explicit-deadline precision is at least 90%, and all misses are documented.                        |
-| AC-11 | Security                              | OAuth tokens and email bodies never appear in application logs; refresh tokens are encrypted at rest.                                                                                            |
-| AC-12 | Resilience                            | A Gmail, Calendar, or AI failure leaves the last successful data readable and exposes a retryable error.                                                                                         |
-| AC-13 | Performance                           | With 100 synchronized messages, the populated dashboard becomes interactive within 2 seconds in the designated demo browser after API data is available.                                         |
-| AC-14 | Traceability                          | Each P0 requirement maps to at least one test and one final report section.                                                                                                                      |
+| ID    | Requirement           | Acceptance evidence                                                                                                                                                                |
+| ----- | --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| AC-01 | Account connection    | Each of the four approved test users can complete OAuth and reconnect after an expired access token.                                                                               |
+| AC-02 | Gmail synchronization | A run imports up to 100 messages from the configured 14-day window and records success or an actionable error.                                                                     |
+| AC-03 | Idempotency           | Running the same synchronization three times produces one stored email and at most one active suggestion per extracted action.                                                     |
+| AC-04 | Human approval        | No task or Google Calendar event is created before an explicit approval action.                                                                                                    |
+| AC-05 | Evidence              | Every AI-derived action or deadline displays a quotation that is verified as part of the normalized source body.                                                                   |
+| AC-06 | Deadline safety       | An uncertain or unsupported deadline is flagged for review rather than silently treated as exact.                                                                                  |
+| AC-07 | Task lifecycle        | A user can create, edit, reject, approve, complete, and mark a task as waiting for reply.                                                                                          |
+| AC-08 | Calendar creation     | An approved event is created once, stores the Google event ID, and is not duplicated after retry.                                                                                  |
+| AC-09 | Reminder metadata     | A user can create, edit and cancel reminders for an owned approved/manual task; changes persist across reloads and are clearly labelled as metadata with no notification delivery. |
+| AC-10 | Accuracy              | On a versioned, anonymized 50-message evaluation set: action-required recall is at least 90%, explicit-deadline precision is at least 90%, and all misses are documented.          |
+| AC-11 | Security              | OAuth tokens and email bodies never appear in application logs; refresh tokens are encrypted at rest.                                                                              |
+| AC-12 | Resilience            | A Gmail, Calendar, or AI failure leaves the last successful data readable and exposes a retryable error.                                                                           |
+| AC-13 | Performance           | With 100 synchronized messages, the populated dashboard becomes interactive within 2 seconds in the designated demo browser after API data is available.                           |
+| AC-14 | Traceability          | Each P0 requirement maps to at least one test and one final report section.                                                                                                        |
 
 ## 5. Technical architecture
 
 ### Selected stack
 
-| Area                   | Choice                                                                                                                                       | Reason                                                                                                |
-| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
-| Web client             | React + TypeScript + Vite                                                                                                                    | Browser-first application with a small build system and responsive layouts.                           |
-| Client state/data      | TanStack Query; local component state; Zod validation                                                                                        | Clear server-state ownership without a global-state framework.                                        |
-| API                    | Node.js LTS + TypeScript + Fastify                                                                                                           | Small, typed, testable HTTP service with low framework overhead.                                      |
-| Database               | PostgreSQL hosted in Supabase for staging/demo                                                                                               | Durable relational constraints and a managed course deployment. Supabase Auth is not required.        |
-| Database access        | Drizzle ORM and SQL migrations                                                                                                               | Typed access while keeping schema and generated SQL reviewable.                                       |
-| Job processing         | `pg-boss` backed by PostgreSQL                                                                                                               | Retryable sync/extraction work without operating Redis.                                               |
-| AI extraction          | OpenAI Responses API structured output behind an `Extractor` interface                                                                       | Schema-constrained output and a replaceable provider boundary.                                        |
-| Google integration     | Gmail API and Google Calendar API via backend-owned OAuth flow                                                                               | Tokens remain off the device and integration behavior is centralized.                                 |
-| Canvas calendar feed   | Maintained iCalendar parser behind pinned Sofia HTTPS, encrypted per-user subscription and bounded snapshots                                 | Native calendar dates without AI; explicit calendar-only consent, no provider writes.                 |
-| Reminders              | Durable reminder metadata; delivery decision pending                                                                                         | No claim of reliable closed-browser delivery and no unapproved push/email infrastructure.             |
-| Unit/integration tests | Vitest, React Testing Library, PostgreSQL test database                                                                                      | Fast deterministic tests around behavior and constraints.                                             |
-| End-to-end smoke       | Local Playwright/browser tooling on the designated browser                                                                                   | Exercises the actual web interaction path; no Google UI writes.                                       |
-| Quality/security       | TypeScript strict mode, ESLint, Prettier, full PostgreSQL tests, isolated web build in GitHub CI; separate dependency/secret/security review | `Quality gate` is the merge-policy check; additional security tools are not implied to be configured. |
+| Area                   | Choice                                                                                                       | Reason                                                                                                                              |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------- |
+| Web client             | React + TypeScript + Vite                                                                                    | Browser-first application with a small build system and responsive layouts.                                                         |
+| Client state/data      | TanStack Query; local component state; Zod validation                                                        | Clear server-state ownership without a global-state framework.                                                                      |
+| API                    | Node.js LTS + TypeScript + Fastify                                                                           | Small, typed, testable HTTP service with low framework overhead.                                                                    |
+| Database               | PostgreSQL hosted in Supabase for staging/demo                                                               | Durable relational constraints and a managed course deployment. Supabase Auth is not required.                                      |
+| Database access        | Drizzle ORM and SQL migrations                                                                               | Typed access while keeping schema and generated SQL reviewable.                                                                     |
+| Job processing         | `pg-boss` backed by PostgreSQL                                                                               | Retryable sync/extraction work without operating Redis.                                                                             |
+| AI extraction          | OpenAI Responses API structured output behind an `Extractor` interface                                       | Schema-constrained output and a replaceable provider boundary.                                                                      |
+| Google integration     | Gmail API and Google Calendar API via backend-owned OAuth flow                                               | Tokens remain off the device and integration behavior is centralized.                                                               |
+| Canvas calendar feed   | Maintained iCalendar parser behind pinned Sofia HTTPS, encrypted per-user subscription and bounded snapshots | Native calendar dates without AI; explicit calendar-only consent, no provider writes.                                               |
+| Reminders              | Durable owned-task reminder metadata (AC-09 / SRS v2.0 FR17)                                                 | Creation, editing and cancellation; no notification delivery in this release.                                                       |
+| Unit/integration tests | Vitest, React Testing Library, PostgreSQL test database                                                      | Fast deterministic tests around behavior and constraints.                                                                           |
+| End-to-end smoke       | Local Playwright/browser tooling on the designated browser                                                   | Exercises the actual web interaction path; no Google UI writes.                                                                     |
+| Quality/security       | TypeScript, ESLint, Prettier, full PostgreSQL tests, isolated build and `scripts/security-gate.py`           | Required latest-integrated `Quality gate`; pinned Semgrep/Gitleaks, zero-vulnerability npm audit and fail-closed positive controls. |
 
 ### Runtime topology
 
@@ -153,7 +155,7 @@ flowchart LR
     W --> L[Structured-output AI API]
     A --> N[OAuth callback]
     N --> G
-    U --> R[Reminder metadata; delivery pending]
+    U --> R[Reminder metadata; no delivery]
 ```
 
 For the classroom deployment, the API and worker may run in one service process. Their modules remain separate so jobs can move to a dedicated worker without changing contracts.
@@ -384,7 +386,7 @@ A requested change enters P0 only if it is required by the instructor, replaces 
 5. **AI evaluation:** versioned 50-message set with category/action/deadline/evidence labels and precision/recall report.
 6. **API integration tests:** OAuth-state misuse, sync lifecycle, approval, task updates, calendar retry, disconnect/delete.
 7. **Component tests:** loading, empty, error, review, edit, approval, and task-status interactions.
-8. **Web end-to-end smoke:** connect test account, synchronize, review, approve, create/cancel reminder metadata, create calendar event, re-sync, complete. Reminder delivery is not passed until its replacement criterion is approved and exercised.
+8. **Web end-to-end smoke:** connect test account, synchronize, review/edit/approve, create/edit/cancel reminder metadata, separately confirm Calendar creation, complete and re-sync. Verify persistence and no-delivery labels for AC-09; synthetic providers do not prove live-provider acceptance.
 9. **Exploratory/usability test:** a non-developer teammate completes the primary scenario without coaching.
 10. **Release rehearsal:** run the deployed app on the final device/network and verify the demonstration script and cached last-success state.
 
@@ -406,7 +408,7 @@ A fixed S0–S2 defect requires a regression test that demonstrates the consumer
 - Three repeated Gmail syncs and calendar retries create no duplicates.
 - Evaluation thresholds in AC-10 pass on frozen data.
 - OAuth revocation and account-data deletion are exercised.
-- The actual web build completes the primary demonstration scenario; reminder delivery is explicitly resolved rather than silently counted as passed.
+- The actual web build completes the primary demonstration scenario, including persistent create/edit/cancel reminder metadata and truthful no-delivery labels under AC-09.
 - Proposal/report/slides match implemented behavior and disclose deferred scope.
 
 ## 14. Course deliverables and traceability
@@ -467,4 +469,4 @@ An ADR records context, decision, alternatives rejected, consequences, and verif
 
 ## 18. Definition of done
 
-The project is done only when a team member can use the actual web build to complete the primary demonstration scenario against the deployed API and a real approved Google test account; repeated sync/retry creates no duplicates; the accuracy, security, and release gates pass; reminder delivery has an explicitly approved replacement criterion and observed result; the final documents describe the observed implementation; and all four members can defend the requirements, architecture, risk, tests, AI usage, and limitations.
+The project is done only when a team member can use the actual web build to complete the primary demonstration scenario against the deployed API and a real approved Google test account; repeated sync/retry creates no duplicates; the accuracy, security, and release gates pass; metadata-only AC-09 has observed create/edit/cancel persistence and no-delivery labels; the final documents describe the observed implementation; and all four members can defend the requirements, architecture, risk, tests, AI usage, and limitations. The November 22 scope decision does not waive real-model, four-user, HTTPS, non-developer rehearsal or independent course-review evidence.

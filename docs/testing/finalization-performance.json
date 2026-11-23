@@ -1,0 +1,66 @@
+{
+  "browser": "157.0.8103.79",
+  "node": "v22.23.5",
+  "platform": "darwin/arm64",
+  "frontendBundle": "/assets/index-CdPtRptf.js",
+  "viewport": "1440x1000",
+  "timezone": "America/Los_Angeles",
+  "motion": "normal; finite UI transitions included in the measured interval",
+  "messages": 100,
+  "methodology": "T31: one warm-up, five cache-disabled and five cache-enabled reloads; t0 last consumed dashboard API payload; t1 painted source-detail round trip and loaded Gmail filter result. Driver waits included; ten-second pacing only between runs.",
+  "results": [
+    {
+      "run": 1,
+      "cache": "disabled",
+      "milliseconds": 400.1000003814697
+    },
+    {
+      "run": 2,
+      "cache": "disabled",
+      "milliseconds": 361
+    },
+    {
+      "run": 3,
+      "cache": "disabled",
+      "milliseconds": 397.2999997138977
+    },
+    {
+      "run": 4,
+      "cache": "disabled",
+      "milliseconds": 402.80000019073486
+    },
+    {
+      "run": 5,
+      "cache": "disabled",
+      "milliseconds": 362.30000019073486
+    },
+    {
+      "run": 6,
+      "cache": "enabled/warm",
+      "milliseconds": 355.7000002861023
+    },
+    {
+      "run": 7,
+      "cache": "enabled/warm",
+      "milliseconds": 354.2000002861023
+    },
+    {
+      "run": 8,
+      "cache": "enabled/warm",
+      "milliseconds": 367.40000009536743
+    },
+    {
+      "run": 9,
+      "cache": "enabled/warm",
+      "milliseconds": 396.2000002861023
+    },
+    {
+      "run": 10,
+      "cache": "enabled/warm",
+      "milliseconds": 353.59999990463257
+    }
+  ],
+  "maxMilliseconds": 402.80000019073486,
+  "medianMilliseconds": 364.85000014305115,
+  "passed": true
+}

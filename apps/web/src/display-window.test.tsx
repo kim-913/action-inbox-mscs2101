@@ -131,6 +131,7 @@ describe("saved display window", () => {
     const view = render(<test.View />);
     await screen.findByText("Readable without extraction");
     expect(screen.getByText("Saved: 14 days, including today")).toBeTruthy();
+    fireEvent.click(screen.getByLabelText("Change display window"));
     const customInput = screen.getByLabelText("Custom days (1–365)");
     expect(customInput).toBeInstanceOf(HTMLInputElement);
     if (customInput instanceof HTMLInputElement)
@@ -168,6 +169,7 @@ describe("saved display window", () => {
     await test.api.session();
     render(<test.View />);
     await screen.findByText("Readable without extraction");
+    fireEvent.click(screen.getByLabelText("Change display window"));
     fireEvent.change(screen.getByLabelText("Display days"), {
       target: { value: "custom" },
     });

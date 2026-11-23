@@ -1,0 +1,49 @@
+rules:
+  - id: no-dynamic-code
+    languages: [javascript, typescript]
+    severity: ERROR
+    message: Untrusted source text must never become executable code.
+    pattern-either:
+      - pattern: eval(...)
+      - pattern: new Function(...)
+  - id: no-shell-execution
+    languages: [javascript, typescript]
+    severity: ERROR
+    message: Application code must not pass strings to a shell.
+    pattern-either:
+      - pattern: child_process.exec(...)
+      - pattern: child_process.execSync(...)
+  - id: no-unsafe-html
+    languages: [javascript, typescript]
+    severity: ERROR
+    message: Render provider content as text, not executable HTML.
+    pattern-either:
+      - pattern: $ELEMENT.innerHTML = $VALUE
+      - pattern: <$TAG ... dangerouslySetInnerHTML={$VALUE} ... />
+  - id: no-tls-bypass
+    languages: [javascript, typescript]
+    severity: ERROR
+    message: Provider TLS certificate verification must remain enabled.
+    pattern-either:
+      - pattern: "{ ..., rejectUnauthorized: false, ... }"
+      - pattern: process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0"
+  - id: parameterized-sql
+    languages: [javascript, typescript]
+    severity: ERROR
+    message: Do not interpolate untrusted data into SQL; bind query parameters.
+    pattern-either:
+      - pattern: $DB.query(`...${...}...`, ...)
+      - pattern: $DB.query($SQL + $VALUE, ...)
+  - id: explicit-gcm-tag-length
+    languages: [javascript, typescript]
+    severity: ERROR
+    message: AES-GCM decryption must explicitly require the protocol's 16-byte tag.
+    pattern: createDecipheriv("aes-256-gcm", $KEY, $IV)
+  - id: no-sensitive-console-logging
+    languages: [javascript, typescript]
+    severity: ERROR
+    message: Do not log request credentials or private request bodies.
+    pattern-either:
+      - pattern: console.$METHOD(..., $REQUEST.headers, ...)
+      - pattern: console.$METHOD(..., $REQUEST.body, ...)
+      - pattern: console.$METHOD(..., $REQUEST.cookies, ...)

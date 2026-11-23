@@ -61,9 +61,15 @@ export function registerCalendar(app: FastifyInstance, runtime: Runtime): void {
         "timeZone",
         validTimezone(timezone) ? timezone : "UTC",
       );
+      let connectionId: string | undefined;
       let items: CalendarEvent[] | undefined;
       let error: ApiError | null = null;
       try {
+        // Capture the initiating lifecycle, then release the user lock before
+        // provider work. A reconnect must not authorize this request's result.
+        connectionId = await transaction(runtime, userId, (client) =>
+          requireConnection(client, userId),
+        );
         items = parseUpcoming(
           await runtime.google.request(userId, url.toString()),
         );
@@ -71,20 +77,23 @@ export function registerCalendar(app: FastifyInstance, runtime: Runtime): void {
         error = googleErrorBody(safeGoogleFailure(failure), request.id);
       }
       return transaction(runtime, userId, async (client) => {
-        if (items !== undefined) {
-          await requireConnection(client, userId);
-          await client.query(
-            `INSERT INTO calendar_snapshots(user_id,items,last_successful_fetch_at) VALUES ($1,$2,now())
-           ON CONFLICT(user_id) DO UPDATE SET items=EXCLUDED.items,last_successful_fetch_at=EXCLUDED.last_successful_fetch_at,error=NULL,updated_at=now()`,
-            [userId, JSON.stringify(items)],
-          );
-        } else {
-          // A completed disconnect must not recreate retained provider data.
-          await client.query(
-            `INSERT INTO calendar_snapshots(user_id,error) SELECT $1,$2 WHERE EXISTS(SELECT 1 FROM google_connections WHERE user_id=$1)
-           ON CONFLICT(user_id) DO UPDATE SET error=EXCLUDED.error,updated_at=now()`,
-            [userId, JSON.stringify(error)],
-          );
+        if (connectionId !== undefined) {
+          // Fence both successful data and safe errors under the same user lock
+          // as disconnect. Neither may restore or overwrite another lifecycle.
+          await requireConnection(client, userId, connectionId);
+          if (items !== undefined) {
+            await client.query(
+              `INSERT INTO calendar_snapshots(user_id,items,last_successful_fetch_at) VALUES ($1,$2,now())
+             ON CONFLICT(user_id) DO UPDATE SET items=EXCLUDED.items,last_successful_fetch_at=EXCLUDED.last_successful_fetch_at,error=NULL,updated_at=now()`,
+              [userId, JSON.stringify(items)],
+            );
+          } else {
+            await client.query(
+              `INSERT INTO calendar_snapshots(user_id,error) VALUES ($1,$2)
+             ON CONFLICT(user_id) DO UPDATE SET error=EXCLUDED.error,updated_at=now()`,
+              [userId, JSON.stringify(error)],
+            );
+          }
         }
         const snapshots = await client.query<SnapshotRow>(
           "SELECT * FROM calendar_snapshots WHERE user_id=$1",

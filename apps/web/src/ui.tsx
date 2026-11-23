@@ -21,8 +21,9 @@ export function ErrorNotice({ error }: { error: unknown }) {
           </details>
           {error.code === "CONFLICT" && (
             <p>
-              Another change was saved first. Reload this item before editing
-              again; your current draft has not been applied.
+              The saved version changed. Reload this item to reconcile its
+              current state before editing or retrying; a previous request may
+              already have been applied.
             </p>
           )}
           {error.code === "GOOGLE_RECONNECT_REQUIRED" && (
@@ -73,13 +74,22 @@ export function useAction(): ActionState {
   }
   return { pending, error, message, run };
 }
-export function ActionNotice({ action }: { action: ActionState }) {
+export function ActionNotice({
+  action,
+  pendingMessage,
+}: {
+  action: ActionState;
+  pendingMessage: string;
+}) {
   return (
     <>
       <ErrorNotice error={action.error} />
       {(action.pending || action.message) && (
-        <p className="action-status" role="status">
-          {action.pending ? "Saving…" : action.message}
+        <p
+          className={`action-status ${action.pending ? "pending" : "success"}`}
+          role="status"
+        >
+          {action.pending ? pendingMessage : action.message}
         </p>
       )}
     </>

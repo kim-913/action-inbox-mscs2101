@@ -94,34 +94,9 @@ VITE_API_URL=http://127.0.0.1:3002 \
   npm run dev --workspace @action-inbox/web -- --host 127.0.0.1 --port 5174 --strictPort
 ```
 
-Open **http://127.0.0.1:5174** in a **separate browser profile**, not the owner's signed-in profile. Cookies are not isolated by port. The normal sign-in button deliberately rejects loopback provider authorization URLs; do not weaken that production guard. For this synthetic harness only, open Developer Tools on 5174 and execute this explicit session/bootstrap flow:
+Open **http://127.0.0.1:3002/__smoke/start** in a **separate browser profile**, not the owner's signed-in profile. Cookies are not port-isolated. This harness-only entry point bootstraps the real synthetic OAuth state/callback flow and redirects to 5174; it is the recommended path instead of a DevTools console recipe. The normal production sign-in redirect guard remains unchanged, with no production auth bypass.
 
-```javascript
-const api = "http://127.0.0.1:3002";
-const sessionResponse = await fetch(`${api}/v1/auth/session`, {
-  credentials: "include",
-});
-if (!sessionResponse.ok) throw new Error("Session bootstrap failed");
-const session = await sessionResponse.json();
-const startResponse = await fetch(`${api}/v1/auth/google/start`, {
-  method: "POST",
-  credentials: "include",
-  headers: {
-    "Content-Type": "application/json",
-    "X-CSRF-Token": session.csrfToken,
-  },
-  body: "{}",
-});
-if (!startResponse.ok) throw new Error("Synthetic sign-in failed");
-const start = await startResponse.json();
-const destination = new URL(start.authorizationUrl);
-if (destination.protocol !== "http:" || destination.hostname !== "127.0.0.1") {
-  throw new Error("Expected the isolated loopback test provider");
-}
-location.assign(destination.href);
-```
-
-Expected: the local synthetic OAuth callback returns to 5174, signs in as the fixture account, and imports six delayed synthetic messages. Extraction is disabled; an extraction-unavailable message is expected, not a reason to enable a real model. If proposal/extraction interactions are needed, restart **only this harness** with `SMOKE_EXTRACTION=synthetic` added to its command. This uses a loopback synthetic HTTP provider, not OpenAI.
+Expected: the local synthetic callback signs in as the fixture account and imports six delayed synthetic messages. Extraction is disabled by default; extraction-unavailable is expected, not a reason to enable a real model. For proposal interactions, restart **only this harness** with `SMOKE_EXTRACTION=synthetic`; it selects only a loopback synthetic HTTP provider, not OpenAI. Optional `SMOKE_MESSAGE_COUNT=100` supports the performance rehearsal; default remains six.
 
 For Canvas interactions, use the non-secret fixture input `https://sofia.instructure.com/feeds/calendars/user_synthetic.ics` **only in this harness**. The injected reader returns repository fixtures; this URL is not a live subscription. To exercise snapshot changes/outage, the harness alone provides:
 
@@ -130,13 +105,13 @@ curl -fsS -X POST http://127.0.0.1:3002/__smoke/canvas-mode \
   -H 'Content-Type: application/json' -d '{"mode":"changed"}'
 ```
 
-Choose `original`, `changed`, or `unavailable`, then click Canvas Refresh. These routes do not exist in production. Fixture dates are fixed: choose a display window that includes them before navigating the planner. A range with no matching fixture dates is correctly empty. The setting changes display, not the provider import window.
+Choose `original`, `changed`, or `unavailable`, then click Canvas Refresh. These routes do not exist in production. Harness Gmail deadlines, Calendar and Canvas dates are current-relative so the default display window is useful; committed fixture files retain static dates for deterministic tests. The display setting changes display, not the provider import window.
 
-Restarting the harness generates a new encryption key. Use disposable fixture data only; clear this isolated browser profile and recreate your disposable environment if you need a clean session. Never copy real tokens into this database.
+Restarting the harness generates a new encryption key. Use only disposable fixture data and follow the reset procedure below before a clean restart; never copy real tokens into this database.
 
 ### Mode B — production-path API with your own approved providers
 
-Use this only when a task requires real-provider behavior. Coordinate test-account approval and credentials with the owner privately. [Deployment configuration](docs/architecture/deployment.md) and [connector prerequisites](docs/testing/connector-prerequisites.md) are authoritative.
+Use this only with separate explicit real-provider authorization; this finalization/demo assignment does not authorize that path. Coordinate test-account approval and credentials with the owner privately. [Deployment configuration](docs/architecture/deployment.md) and [connector prerequisites](docs/testing/connector-prerequisites.md) are authoritative.
 
 For a teammate's first real Gmail connection, follow the [Google developer onboarding guide](docs/testing/google-developer-onboarding.md): private access request, maintainer approval, both allowlists, exact local OAuth configuration, troubleshooting, costs, and the separate production-user flow. Completing Mode A or cloning the repository does not grant real Google access.
 
@@ -186,6 +161,17 @@ GitHub repository settings are configured for squash-only merging, automatic del
 
 The workflow at [`.github/workflows/ci.yml`](.github/workflows/ci.yml) is named `CI`, with stable job/check name `Quality gate`. It runs on pull requests, pushes to `main`, and manual dispatch using Node.js 22, npm 11, and disposable PostgreSQL 16. It performs dependency installation, typechecking, linting, formatting checks, the full test suite with `TEST_DATABASE_URL`, and an isolated web production build. It does not use real secrets/providers, deploy, or replace changed-path acceptance evidence.
 
+The security step is `python3 scripts/security-gate.py`, using pinned Semgrep 1.186.0 with seven local rules, a checksum-pinned Gitleaks 8.30.1 binary, and npm audit requiring zero vulnerabilities at all severities. Positive controls prove detection; scanner failures, parse errors and invalid/missing reports fail closed. Only two exact public-prose false positives are dispositioned, expiring 2026-12-31; configuration and review evidence are in [security review](docs/security/local-review.md). Keep the required protected-PR check successful on the latest commit integrated with current `main`; zero approvals does not waive it.
+
+Install Python 3 and the pinned scanners before running the local gate. With [uv](https://docs.astral.sh/uv/getting-started/installation/) available, install Semgrep once:
+
+```bash
+uv tool install semgrep==1.186.0
+export PATH="$HOME/.local/bin:$PATH"
+```
+
+Download the matching platform archive from the [Gitleaks 8.30.1 release](https://github.com/gitleaks/gitleaks/releases/tag/v8.30.1), verify its SHA-256 against the release checksums, and put the extracted binary on `PATH` or set `GITLEAKS_BIN` to its absolute path. The Apple Silicon archive `gitleaks_8.30.1_darwin_arm64.tar.gz` used for this rehearsal has SHA-256 `b40ab0ae55c505963e365f271a8d3846efbc170aa17f2607f13df610a9aeb6a5`. CI contains the pinned Linux x64 installation commands. Do not substitute an unpinned package-manager version.
+
 Local equivalent, using only the disposable test-suite database created in section 3:
 
 ```bash
@@ -195,6 +181,7 @@ npm run lint
 npm run format:check
 TEST_DATABASE_URL=postgresql://postgres:local-only@127.0.0.1:55433/action_inbox_test npm test
 VITE_API_URL=http://127.0.0.1:3002 npm run build --workspace @action-inbox/web -- --outDir ../../.local-preview/ci-dist
+python3 scripts/security-gate.py
 ```
 
 Without `TEST_DATABASE_URL`, database tests skip; label that run accordingly and do not count it as the full merge gate. CI must run database suites without skips. Never point tests at the browser-fixture or user database. For a focused suite, use its workspace, for example:
@@ -203,7 +190,9 @@ Without `TEST_DATABASE_URL`, database tests skip; label that run accordingly and
 npm run test --workspace @action-inbox/web -- src/CanvasFeed.test.tsx
 ```
 
-For a production-build UI rehearsal, stop only your 5174 development server, then:
+### Production-build demo rehearsal and reset
+
+Use Mode A's disposable database and API. For the review path, start the harness with `SMOKE_EXTRACTION=synthetic`; add `SMOKE_MESSAGE_COUNT=100` when measuring AC-13. Both are synthetic-only, not authorization for paid extraction. Stop only your 5174 development server, then:
 
 ```bash
 VITE_API_URL=http://127.0.0.1:3002 npm run build --workspace @action-inbox/web -- --outDir ../../.local-preview/smoke-dist
@@ -211,6 +200,40 @@ npm run preview --workspace @action-inbox/web -- --outDir ../../.local-preview/s
 ```
 
 Observe the changed path in the browser and record viewport, steps, expected/actual result, revision, and evidence. Use synthetic screenshots only. A build or test pass alone does not establish browser usability, real Google/Canvas acceptance, or model accuracy. For docs-only work, verify links, commands changed by the guide, and formatting rather than claiming an unrelated full regression run.
+
+Rehearse on a separate profile via **http://127.0.0.1:3002/__smoke/start**, recording revision, browser/device, viewport, timezone, build command and actual outcomes:
+
+1. Confirm automatic import, readable original messages and source evidence. For T37, open the synthetic actionable message; review its action/deadline evidence, edit, then approve. Confirm one source-linked task, not an automatic external write.
+2. Mark the task Waiting for Reply, then return to Pending. Create reminder metadata, edit it, reload to check persistence, and cancel it. Confirm the no-delivery label throughout (AC-09 / SRS v2.0 FR17); do not expect a notification.
+3. Separately confirm Create Calendar event once; inspect the resulting synthetic event/link. Complete the task, resynchronize three times and retry the same intent as applicable; check that tasks/events do not duplicate.
+4. Connect Canvas using the non-secret fixture input above. Confirm four synthetic items in the original mode, then switch to `unavailable` and Refresh: the prior snapshot stays visible with an error. Switch to `original` and Refresh to recover; use `changed` to inspect replacement/removal without implying coursework completion.
+5. Exercise Planner source filters and manual task creation, including an undated task in its labelled section. Change and reload the display window. With 100 messages, measure interactivity after API data is available rather than counting delayed import time as UI render time.
+
+This is a repeatable procedure, not a claim that every acceptance prerequisite is complete. Current centralized checks, actual browser actions, screenshots, timings, and remaining gates are recorded in [P0 evidence](docs/testing/p0-evidence.md). Real-model, four-user, HTTPS and non-developer acceptance cannot be established by the synthetic harness.
+
+For repeatable T31 performance capture, keep the production preview on 5174 and harness on 3002 with `SMOKE_MESSAGE_COUNT=100`. The committed lockfile resolves the root Playwright development dependency to 1.65.1. Use an installed Chrome executable:
+
+```bash
+CHROME_PATH="/path/to/installed/chrome" node scripts/demo-performance.mjs
+```
+
+Alternatively, install the isolated Playwright browser and run without `CHROME_PATH`:
+
+```bash
+npx playwright install chromium
+node scripts/demo-performance.mjs
+```
+
+The script accepts no other URLs or existing browser profile; it bootstraps its own synthetic session. It performs one warmup, five cache-disabled runs and five warm runs, measuring source-detail roundtrip and the loaded Gmail-filter result from the last consumed dashboard payload to the painted result. Ten-second gaps **between** runs respect the production request limit; there are no intentional pauses inside the measured interval. Each timestamped directory under ignored `.local-preview/performance/` retains its 100-message snapshot, completed timings, failure record if applicable, and trace. This command guide is not a timing/pass claim; use the recorded evidence for results.
+
+For a repeatable clean reset, **stop your smoke harness first**. Confirm from your own startup command/container metadata that the target is the disposable `action_inbox_smoke` database in `action-inbox-contributor-db` on loopback 55433. If it is not exactly that owned environment, do not run these commands. Do not reset the live 55432 database, remove the shared container/volume, or touch `action_inbox_test`.
+
+```bash
+docker exec action-inbox-contributor-db dropdb -U postgres action_inbox_smoke
+docker exec action-inbox-contributor-db createdb -U postgres action_inbox_smoke
+```
+
+Clear only the separate synthetic profile's site data, restart the harness with the same selected synthetic options, and open `/__smoke/start` again. Startup reapplies migrations to the empty smoke database. This preserves the separate test-suite database and leaves live services, credentials and production build untouched.
 
 ## 5. Course deliverables and team evidence
 

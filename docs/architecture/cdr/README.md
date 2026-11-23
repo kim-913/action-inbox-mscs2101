@@ -27,6 +27,9 @@ Code: [pipeline registration](../../../services/api/src/pipeline/index.ts), [wor
 - A suggestion can yield at most one task, enforced by the unique source-suggestion field. Manual tasks have null source IDs and an account-scoped unique request ID for retries.
 - A task has zero or one Calendar link. Requested/Created/Failed status and the external event ID support reconciliation; a link's existence alone does not prove external creation succeeded.
 - Source identity and date meaning remain distinct: a native due date stays a due date, while an event retains its time slot. Stored snapshots retain the last successful data after failed refresh.
+- Current finalization clarification (November 22): upcoming Calendar reads bind the original Google connection ID before network work and revalidate it under the user-row lock on both success and failure persistence. Stale lifecycle responses return 401 `GOOGLE_RECONNECT_REQUIRED` without changing snapshot/error; provider network work remains outside the lock.
+- Authentication encryption now explicitly requires a 16-byte GCM tag; the encrypted envelope remains unchanged. No migration or production-auth bypass is introduced.
+- Under delegated finalization scope, AC-09 / SRS v2.0 FR17 covers persistent create/edit/cancel reminder metadata for owned approved/manual tasks, labelled no delivery. Notification channels remain outside this release.
 
 Code: [ingestion constraints](../../../database/migrations/0003_ingestion.sql), [task constraints](../../../database/migrations/0004_tasks.sql), [Calendar event identity](../../../database/migrations/0005_calendar_event_id.sql).
 
@@ -52,3 +55,5 @@ The course Canvas-feed ADR remains **Under Discussion** in SRS v2.0 Appendix B; 
 ## Provenance and limits
 
 The eight Mermaid/SVG files were copied from the [Drive CDR diagrams folder](https://drive.google.com/drive/folders/1SixuyIQEaWfEdbWK-Yn6oM0VhFiynTRj) on November 14, 2026, with source checksums verified. Their code baseline is `251dfec1e3121fe90af9568c022010b4568a6179`, as recorded in the source comments. These are selected design views: the data model omits some snapshot/reminder tables, and the class view includes a function module as well as interfaces/classes. They do not establish completed real-model evaluation, provider acceptance or notification delivery.
+
+These current clarifications do not rewrite the imported diagram baseline or establish deployment. See [P0 evidence](../../testing/p0-evidence.md) for the integration owner's synthetic rehearsal and current screenshots/timings, and [security review](../../security/local-review.md) for the pinned, fail-closed security gate. Real-model, four-user, HTTPS and non-developer acceptance gaps remain separate from source readiness.

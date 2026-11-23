@@ -71,6 +71,20 @@ describe("API liveness", () => {
     expect(response.json()).toMatchObject({ code: "INTERNAL_ERROR" });
   });
 
+  it("returns a retryable 429 rather than an internal error when throttled", async () => {
+    const app = application();
+    void app.register(async (routes) => {
+      routes.get("/limited", async () => ({ ok: true }));
+    });
+    for (let index = 0; index < 120; index += 1) {
+      expect((await app.inject("/limited")).statusCode).toBe(200);
+    }
+    const response = await app.inject("/limited");
+    expect(response.statusCode).toBe(429);
+    expect(response.json()).toMatchObject({ code: "RATE_LIMITED" });
+    expect(Number(response.headers["retry-after"])).toBeGreaterThan(0);
+  });
+
   it("allows credentials only for the configured web origin", async () => {
     const app = application();
     const allowed = await app.inject({

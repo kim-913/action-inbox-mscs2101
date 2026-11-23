@@ -1,6 +1,6 @@
 # Action Inbox
 
-Action Inbox is a browser-first, source-linked connected planner. Consented Gmail imports remain readable and feed an internal calendar/agenda with evidence-backed proposals when extraction is available. Proposals, approved/manual tasks, and existing external Calendar events remain distinct; an internal suggestion is not permission to create a task or external event. Reminder delivery remains pending: stored in-app due metadata is not a delivered notification.
+Action Inbox is a browser-first, source-linked connected planner. Consented Gmail imports remain readable and feed an internal calendar/agenda with evidence-backed proposals when extraction is available. Proposals, approved/manual tasks, and existing external Calendar events remain distinct; an internal suggestion is not permission to create a task or external event. Reminders are persistent in-app metadata, not delivered notifications.
 
 ## Contributors: start here
 
@@ -24,11 +24,11 @@ The repository is hosted publicly at [kim-913/action-inbox-mscs2101](https://git
 
 The user approved incremental Outlook and Canvas connectors, a first-class internal calendar rather than requiring an external calendar, and optional reminders one or two days before assignments plus immediate/time-sensitive work such as flights. Broader OAuth integrations and notification delivery remain roadmap goals. The separately approved Canvas calendar-only subscription below is narrower than full course/grade/submission access. Official API setup/consent is still required for future full integrations; Canvas assignment due dates can be native data, while event times are not automatically deadlines.
 
-Notification delivery and any SMS option need separate permission, mechanism, cost approval, and observed end-to-end delivery. No SMS provider, paid account, message send, or fake enabled control is authorized by the roadmap. Existing P0 AC-09 remains an explicit unresolved delivery criterion. See `docs/requirements/phase-2.md`, `docs/testing/connector-prerequisites.md`, and the authoritative `EXECUTION_PLAN.md`.
+Under the user's November 22 delegated finalization decisions, P0 AC-09 covers creation, editing and cancellation of owned approved/manual task reminder metadata, persisted and clearly labelled as having no delivery. This aligns with SRS v2.0 FR17 and the submitted STP. Notification delivery is outside this release; any future channel or SMS option needs separate permission, mechanism, cost approval and observed end-to-end delivery. No message send or fake enabled delivery control is authorized. See `EXECUTION_PLAN.md` and the future roadmap in `docs/requirements/phase-2.md`.
 
 ### Shared display window and source views
 
-Use **Display window** at the top of the signed-in workspace: choose **7 days**, **30 days**, or **Custom** (1–365), then **Apply display window**. The account-owned setting survives reload and new sessions. Gmail lists show messages received in the last N local calendar days, including today; tasks, Canvas and Calendar show due dates or overlapping events from today through the next N−1 days. Each surface states its exact dates and browser timezone. Undated work is separately labelled, not counted as dated matches.
+Use **Display window → Change** at the top of the signed-in workspace: choose **7 days**, **30 days**, or **Custom** (1–365), then **Apply**. The saved window remains visible while its controls are collapsed. The account-owned setting survives reload and new sessions. Gmail lists show messages received in the last N local calendar days, including today; tasks, Canvas and Calendar show due dates or overlapping events from today through the next N−1 days. Each surface states its exact dates and browser timezone. Undated work is separately labelled, not counted as dated matches.
 
 Planner source controls separate **All**, **Gmail**, **Canvas**, **Google Calendar**, and **Manual tasks**. Gmail remains readable without AI extraction. An upcoming proposal or approved task can still link to an older source email; receipt time is not its deadline. Tasks also have their own source selector. Source selection resets when the signed-in workspace is replaced; the saved day count does not.
 
@@ -81,9 +81,15 @@ Create the disposable PostgreSQL 16 test database using [CONTRIBUTING.md](CONTRI
 
 [`.github/workflows/ci.yml`](.github/workflows/ci.yml) defines workflow `CI` and stable check **`Quality gate`** on pull requests, pushes to `main`, and manual dispatch. Using Node.js 22/npm 11 and disposable PostgreSQL 16, it runs the gates above including all database suites without skips and an isolated production build. No real secrets/providers or deployments are involved. Protected `main` requires this GitHub Actions check and an up-to-date branch while retaining zero approvals.
 
+The security gate is `python3 scripts/security-gate.py`: pinned Semgrep 1.186.0 with seven local rules, checksum-pinned Gitleaks 8.30.1, and npm audit with zero vulnerabilities at every severity. Positive controls and scanner/report errors fail closed. The JSX parser issue is resolved without suppression; two exact public-prose secret false positives expire on 2026-12-31. See [security review](docs/security/local-review.md).
+
+The finalization run passed **381 tests** (102 web, 261 API, 18 contracts), with zero skips, on Node 22.23.5/PostgreSQL 16. Typechecking, lint and the isolated production build passed. [P0 evidence](docs/testing/p0-evidence.md) records synthetic workflow results, screenshots, timings, and all 50 requirement mappings. This is not blanket release acceptance: approved real-model evaluation, four-user Google acceptance, hosted HTTPS acceptance and a non-developer rehearsal remain separate evidence gaps.
+
 The versioned 50-message anonymized evaluation set is `test-data/anonymized/v1/cases.json`. `npm run evaluate -- saved-predictions.json` evaluates saved outputs offline and records provenance; it does not call a model and passing deterministic fixtures does not establish real model accuracy.
 
 For reproducible local-only browser workflow smoke, use a separate disposable loopback `action_inbox_smoke` database (never the live preview on 55432) and run `TEST_DATABASE_URL=… npm run smoke:local-providers`. The harness API uses 3002 and expects a web app on 5174 built/configured with `VITE_API_URL=http://127.0.0.1:3002`. Extraction is disabled by default; `SMOKE_EXTRACTION=synthetic` uses only the loopback synthetic HTTP response provider. This explicit **test harness** exercises actual API/database paths and must not be used as a deployment or claimed as live provider evidence.
+
+In the separate profile, open **http://127.0.0.1:3002/__smoke/start** to bootstrap the real synthetic OAuth state/callback flow and return to 5174; production auth guards are unchanged. Optional `SMOKE_MESSAGE_COUNT=100` supports performance rehearsal (default: six delayed messages). Harness Gmail deadlines, Calendar and Canvas dates are current-relative; committed test fixtures stay static. Follow the [production-build rehearsal and reset guide](CONTRIBUTING.md#production-build-demo-rehearsal-and-reset).
 
 No real OAuth credentials, tokens, raw private emails, or non-anonymized test data belong in this repository or the shared Drive folder.
 

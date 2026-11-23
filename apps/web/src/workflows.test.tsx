@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -82,7 +83,181 @@ afterEach(() => {
 });
 
 describe("P0 browser interactions", () => {
+  it("keeps creation feedback pending until the server confirms success", async () => {
+    let complete!: (response: Response) => void;
+    const fetcher = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(Response.json(session))
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            complete = resolve;
+          }),
+      );
+    const api = new ApiClient("http://localhost:3000", fetcher);
+    await api.session();
+    mount(<ManualTask api={api} />);
+    fireEvent.change(screen.getByLabelText("Title"), {
+      target: { value: "Synthetic task awaiting confirmation" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Create task" }));
+    await waitFor(() => expect(fetcher).toHaveBeenCalledTimes(2));
+    const pending = screen.getByRole("status");
+    expect(pending.textContent).not.toMatch(/created/i);
+    expect((screen.getByRole("button") as HTMLButtonElement).disabled).toBe(
+      true,
+    );
+    expect(api.pendingTask).not.toBeNull();
+    await act(async () => {
+      complete(Response.json(task));
+    });
+    await waitFor(() => expect(api.pendingTask).toBeNull());
+    expect(screen.getByRole("status").textContent).toMatch(/created/i);
+    expect((screen.getByRole("button") as HTMLButtonElement).disabled).toBe(
+      false,
+    );
+  });
+
+  it("preserves source focus, Planner filters and week, and task drafts across source review", async () => {
+    const email = {
+      id,
+      gmailMessageId: "synthetic-message",
+      sender: "office@example.test",
+      subject: "Synthetic source for keyboard review",
+      receivedAt: timestamp,
+      category: null,
+      extractionStatus: "Pending",
+      extractionError: null,
+      suggestions: [],
+    };
+    const fetcher = vi.fn<typeof fetch>().mockImplementation(async (url) => {
+      const path = new URL(String(url)).pathname;
+      if (path === "/v1/auth/session") return Response.json(session);
+      if (path === "/v1/preferences/display")
+        return Response.json({ windowDays: 30 });
+      if (path === "/v1/inbox")
+        return Response.json({
+          items: [email],
+          nextCursor: null,
+          dataState: { lastSuccessfulSyncAt: null, latestSyncRun: null },
+        });
+      if (path === `/v1/emails/${id}`)
+        return Response.json({
+          ...email,
+          normalizedBody: "Synthetic source text.",
+        });
+      if (path === "/v1/tasks")
+        return Response.json({
+          items: [{ ...task, sourceEmailId: id, sourceSuggestionId: id }],
+          nextCursor: null,
+        });
+      if (path === "/v1/calendar/upcoming")
+        return Response.json({
+          items: [],
+          lastSuccessfulFetchAt: null,
+          error: null,
+        });
+      if (path === "/v1/canvas/connection")
+        return Response.json({
+          connected: false,
+          host: "sofia.instructure.com",
+          status: "Disconnected",
+          itemCount: 0,
+          lastSuccessfulFetchAt: null,
+          error: null,
+          refreshPolicy: "Manual",
+          coverage: "Calendar feed only.",
+        });
+      throw new Error(`Unexpected fixture request ${path}`);
+    });
+    const cache = new QueryClient({
+      defaultOptions: { queries: { retry: false, staleTime: Infinity } },
+    });
+    render(
+      <QueryClientProvider client={cache}>
+        <Application api={new ApiClient("http://localhost:3000", fetcher)} />
+      </QueryClientProvider>,
+    );
+    await screen.findByText("Signed in as Test User");
+    fireEvent.click(
+      within(
+        screen.getByRole("navigation", { name: "Main navigation" }),
+      ).getByRole("button", { name: "Inbox" }),
+    );
+    const source = await screen.findByRole("button", { name: email.subject });
+    source.focus();
+    fireEvent.click(source);
+    const heading = await screen.findByRole("heading", {
+      name: "Source email and review",
+    });
+    expect(document.activeElement).toBe(heading);
+    await screen.findByText("Synthetic source text.");
+    fireEvent.click(screen.getByRole("button", { name: "← Back to Inbox" }));
+    expect(document.activeElement).toBe(
+      await screen.findByRole("button", { name: email.subject }),
+    );
+    const navigation = within(
+      screen.getByRole("navigation", { name: "Main navigation" }),
+    );
+    fireEvent.click(navigation.getByRole("button", { name: "Planner" }));
+    const sources = await screen.findByRole("group", {
+      name: "Planner sources",
+    });
+    fireEvent.click(within(sources).getByRole("button", { name: "Gmail" }));
+    fireEvent.click(screen.getByRole("button", { name: "Next week" }));
+    const selectedDay = document
+      .querySelector(".week-grid [aria-pressed='true']")!
+      .getAttribute("aria-label")!;
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Open email & source →" }),
+    );
+    expect(screen.queryByRole("group", { name: "Planner sources" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "← Back to Planner" }));
+    expect(
+      within(screen.getByRole("group", { name: "Planner sources" }))
+        .getByRole("button", { name: "Gmail" })
+        .getAttribute("aria-pressed"),
+    ).toBe("true");
+    expect(
+      screen
+        .getByRole("button", { name: selectedDay })
+        .getAttribute("aria-pressed"),
+    ).toBe("true");
+
+    fireEvent.click(navigation.getByRole("button", { name: "Tasks" }));
+    fireEvent.change(await screen.findByLabelText("Task source"), {
+      target: { value: "gmail" },
+    });
+    fireEvent.click(
+      await screen.findByRole("button", { name: /Send documents/ }),
+    );
+    fireEvent.change(screen.getByLabelText("Title"), {
+      target: { value: "Draft kept while checking source" },
+    });
+    fireEvent.click(
+      screen.getByRole("button", { name: "View source email and evidence" }),
+    );
+    expect(screen.queryByRole("button", { name: "Save task" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "← Back to Tasks" }));
+    expect(
+      (screen.getByLabelText("Task source") as HTMLSelectElement).value,
+    ).toBe("gmail");
+    expect((screen.getByLabelText("Title") as HTMLInputElement).value).toBe(
+      "Draft kept while checking source",
+    );
+    expect(
+      screen
+        .getByRole("button", { name: /Send documents/ })
+        .getAttribute("aria-expanded"),
+    ).toBe("true");
+    expect(fetcher.mock.calls.every((call) => call[1]?.method === "GET")).toBe(
+      true,
+    );
+    cache.clear();
+  });
+
   it("loads the anonymous session and redirects only after an explicit Google connection", async () => {
+    window.history.replaceState(null, "", "/?auth=failed");
     const navigate = vi.fn();
     const fetcher = vi
       .fn<typeof fetch>()
@@ -106,6 +281,15 @@ describe("P0 browser interactions", () => {
         navigate={navigate}
       />,
     );
+    await screen.findByRole("button", { name: "Connect Google account" });
+    fireEvent.click(
+      screen.getByRole("button", { name: "Dismiss sign-in message" }),
+    );
+    expect(
+      screen.queryByRole("button", { name: "Dismiss sign-in message" }),
+    ).toBeNull();
+    expect(navigate).not.toHaveBeenCalled();
+    expect(fetcher).toHaveBeenCalledTimes(1);
     fireEvent.click(
       await screen.findByRole("button", { name: "Connect Google account" }),
     );
@@ -152,6 +336,150 @@ describe("P0 browser interactions", () => {
       `/suggestions/${id}/approve`,
     );
     expect(fetcher).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps a suggestion editable when local date validation rejects it before sending", async () => {
+    const fetcher = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(Response.json(session))
+      .mockResolvedValueOnce(Response.json(task));
+    const api = new ApiClient("http://localhost:3000", fetcher);
+    await api.session();
+    mount(
+      <SuggestionReview
+        api={api}
+        suggestion={suggestion}
+        source="Send documents when ready."
+      />,
+    );
+    const date = screen.getByLabelText(
+      "Due date and time (your local timezone)",
+    ) as HTMLInputElement;
+    fireEvent.change(date, { target: { value: "10000-01-01T12:00" } });
+    expect(date.value).toBe("10000-01-01T12:00");
+    fireEvent.click(screen.getByRole("button", { name: "Approve task" }));
+    await screen.findByRole("alert");
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(date.matches(":disabled")).toBe(false);
+    expect(screen.queryByText(/The outcome may be unknown/)).toBeNull();
+    fireEvent.change(date, { target: { value: "" } });
+    fireEvent.click(screen.getByRole("button", { name: "Approve task" }));
+    await screen.findByText(/Approved. The task is available/);
+    expect(JSON.parse(String(fetcher.mock.calls[1]?.[1]?.body))).toEqual({
+      version: suggestion.version,
+      title: suggestion.title,
+      dueAt: null,
+    });
+  });
+
+  it("preserves the exact saved deadline when only task status changes", async () => {
+    const preciseDue = "2026-10-08T12:30:45.123Z";
+    let stored: Task = { ...task, dueAt: preciseDue };
+    const fetcher = vi
+      .fn<typeof fetch>()
+      .mockImplementation(async (url, options) => {
+        const path = new URL(String(url)).pathname;
+        if (path === "/v1/auth/session") return Response.json(session);
+        if (path === "/v1/tasks")
+          return Response.json({ items: [stored], nextCursor: null });
+        if (path === `/v1/tasks/${id}` && options?.method === "PATCH") {
+          const body = JSON.parse(String(options.body)) as Partial<Task>;
+          stored = { ...stored, ...body, version: stored.version + 1 };
+          return Response.json(stored);
+        }
+        throw new Error(`Unexpected fixture request ${path}`);
+      });
+    const api = new ApiClient("http://localhost:3000", fetcher);
+    await api.session();
+    mount(<Tasks api={api} timezone="UTC" connected openEmail={vi.fn()} />);
+    fireEvent.click(
+      await screen.findByRole("button", { name: /Send documents/ }),
+    );
+    fireEvent.change(screen.getByLabelText("Status"), {
+      target: { value: "Waiting for Reply" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save task" }));
+    await waitFor(() => expect(stored.status).toBe("Waiting for Reply"));
+    expect(stored.dueAt).toBe(preciseDue);
+  });
+
+  it.each(["Save suggestion edits", "Approve task"])(
+    "preserves the exact source deadline during %s without a date edit",
+    async (button) => {
+      const dueAt = "2026-10-08T12:30:45.123Z";
+      const fetcher = vi
+        .fn<typeof fetch>()
+        .mockResolvedValueOnce(Response.json(session))
+        .mockResolvedValueOnce(
+          Response.json(
+            button === "Approve task" ? task : { ...suggestion, dueAt },
+          ),
+        );
+      const api = new ApiClient("http://localhost:3000", fetcher);
+      await api.session();
+      mount(
+        <SuggestionReview
+          api={api}
+          suggestion={{ ...suggestion, dueAt }}
+          source="Send documents when ready."
+        />,
+      );
+      fireEvent.change(screen.getByLabelText("Title"), {
+        target: { value: "Edited title only" },
+      });
+      fireEvent.click(screen.getByRole("button", { name: button }));
+      await waitFor(() => expect(fetcher).toHaveBeenCalledTimes(2));
+      expect(JSON.parse(String(fetcher.mock.calls[1]?.[1]?.body))).toEqual({
+        version: suggestion.version,
+        title: "Edited title only",
+        dueAt,
+      });
+    },
+  );
+
+  it("preserves an existing reminder instant when its metadata is saved unchanged", async () => {
+    const scheduledAt = "2026-10-08T12:30:45.123Z";
+    const reminder: Reminder = {
+      id,
+      taskId: id,
+      scheduledAt,
+      status: "Scheduled",
+      delivery: "Not configured",
+    };
+    const fetcher = vi.fn<typeof fetch>().mockImplementation(async (url) => {
+      const path = new URL(String(url)).pathname;
+      if (path === "/v1/auth/session") return Response.json(session);
+      if (path === "/v1/tasks")
+        return Response.json({
+          items: [{ ...task, reminders: [reminder] }],
+          nextCursor: null,
+        });
+      if (path === `/v1/reminders/${id}`) return Response.json(reminder);
+      throw new Error(`Unexpected fixture request ${path}`);
+    });
+    const api = new ApiClient("http://localhost:3000", fetcher);
+    await api.session();
+    mount(<Tasks api={api} timezone="UTC" connected openEmail={vi.fn()} />);
+    fireEvent.click(
+      await screen.findByRole("button", { name: /Send documents/ }),
+    );
+    fireEvent.click(
+      screen.getByText("In-app reminder metadata", {
+        exact: false,
+        selector: "summary",
+      }),
+    );
+    const form = screen
+      .getByRole("heading", { name: "Edit in-app reminder" })
+      .closest("form")!;
+    fireEvent.click(
+      within(form).getByRole("button", { name: "Save reminder metadata" }),
+    );
+    await screen.findByText(/In-app due metadata saved/);
+    const request = fetcher.mock.calls.find(
+      (call) => call[1]?.method === "PATCH",
+    );
+    expect(JSON.parse(String(request?.[1]?.body))).toEqual({ scheduledAt });
   });
 
   it("retains the same manual creation idempotency key after an ambiguous network failure", async () => {
@@ -317,7 +645,9 @@ describe("P0 browser interactions", () => {
         />,
       );
       fireEvent.click(screen.getByRole("button", { name: label }));
-      await screen.findByText(/Another change was saved first/);
+      expect((await screen.findByRole("alert")).textContent).toContain(
+        "CONFLICT",
+      );
       expect(
         JSON.parse(String(fetcher.mock.calls[1]?.[1]?.body)),
       ).toMatchObject({ version: 3 });
