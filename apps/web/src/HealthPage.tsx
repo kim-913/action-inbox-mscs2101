@@ -87,10 +87,7 @@ export function HealthPage() {
             </>
           )}
         </div>
-        <button
-          type="button"
-          onClick={() => void controller.current?.check()}
-        >
+        <button type="button" onClick={() => void controller.current?.check()}>
           {state.status === "loading"
             ? "Restart check"
             : state.status === "connected"
