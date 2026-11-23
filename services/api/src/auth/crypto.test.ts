@@ -1,4 +1,4 @@
-import { randomBytes } from "node:crypto";
+import { createCipheriv, randomBytes } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { csrfToken, randomSecret, sha256, TokenCipher } from "./crypto.js";
 
@@ -40,6 +40,55 @@ describe("credential encryption and browser secrets", () => {
       ),
     ).toThrow();
   });
+
+  it("reads existing v1 envelopes and keeps the 96-bit IV and 128-bit tag format", () => {
+    const key = Buffer.alloc(32, 7);
+    const iv = Buffer.alloc(12, 3);
+    const legacy = createCipheriv("aes-256-gcm", key, iv);
+    legacy.setAAD(
+      Buffer.from(JSON.stringify(["v1", "connection-one", "google-refresh"])),
+    );
+    const ciphertext = Buffer.concat([
+      legacy.update("synthetic-existing-token", "utf8"),
+      legacy.final(),
+    ]);
+    const envelope = [
+      "v1",
+      iv.toString("base64url"),
+      legacy.getAuthTag().toString("base64url"),
+      ciphertext.toString("base64url"),
+    ].join(":");
+    const cipher = new TokenCipher(key.toString("base64"));
+    expect(cipher.decrypt(envelope, "connection-one", "google-refresh")).toBe(
+      "synthetic-existing-token",
+    );
+    const [version, encodedIv, encodedTag, encodedBody] = cipher
+      .encrypt("synthetic-new-token", "connection-one", "google-refresh")
+      .split(":");
+    expect(version).toBe("v1");
+    expect(Buffer.from(encodedIv!, "base64url")).toHaveLength(12);
+    expect(Buffer.from(encodedTag!, "base64url")).toHaveLength(16);
+    expect(Buffer.from(encodedBody!, "base64url")).toHaveLength(
+      Buffer.byteLength("synthetic-new-token"),
+    );
+  });
+
+  it.each([4, 8, 12, 13, 14, 15, 17])(
+    "rejects an envelope with a %i-byte authentication tag",
+    (tagLength) => {
+      const cipher = new TokenCipher(randomBytes(32).toString("base64"));
+      const parts = cipher
+        .encrypt("synthetic-token", "connection-one", "google-refresh")
+        .split(":");
+      const tag = Buffer.from(parts[2]!, "base64url");
+      parts[2] = Buffer.concat([tag, Buffer.alloc(1)])
+        .subarray(0, tagLength)
+        .toString("base64url");
+      expect(() =>
+        cipher.decrypt(parts.join(":"), "connection-one", "google-refresh"),
+      ).toThrow("Invalid encrypted credential.");
+    },
+  );
 
   it("rejects invalid deployment keys and separates CSRF from the cookie credential", () => {
     expect(() => new TokenCipher("not-a-key")).toThrow();

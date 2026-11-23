@@ -98,17 +98,24 @@ export async function transaction<T>(
 export async function requireConnection(
   client: pg.PoolClient,
   userId: string,
-): Promise<void> {
-  const result = await client.query(
+  expectedConnectionId?: string,
+): Promise<string> {
+  const result = await client.query<{ id: string }>(
     "SELECT id FROM google_connections WHERE user_id=$1 AND revoked_at IS NULL",
     [userId],
   );
-  if (!result.rowCount)
+  const connectionId = result.rows[0]?.id;
+  if (
+    !connectionId ||
+    (expectedConnectionId !== undefined &&
+      connectionId !== expectedConnectionId)
+  )
     throw new ApiFailure(
       401,
       "GOOGLE_RECONNECT_REQUIRED",
       "Connect Google to continue.",
     );
+  return connectionId;
 }
 
 export async function lockTask(

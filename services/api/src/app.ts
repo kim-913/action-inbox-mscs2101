@@ -48,11 +48,6 @@ export function buildApp(
   void app.register(rateLimit, {
     max: 120,
     timeWindow: "1 minute",
-    errorResponseBuilder: (request) => ({
-      code: "RATE_LIMITED",
-      message: "Too many requests. Please try again shortly.",
-      requestId: request.id,
-    }),
   });
   if (options.pool && options.config) {
     const pool = options.pool;
