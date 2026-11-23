@@ -1,6 +1,6 @@
 > Source: [SRS v2.0](https://drive.google.com/file/d/1cOKQWf7hR-8iwY16GdrWlW-PMErboUx8/view), modified November 1, 2026; text and figures synchronized November 14, 2026. This is the current course requirements baseline.
 >
-> Keep SRS version-qualified FR/SEC/NFR references separate from the engineering AC/P2 identifiers in [EXECUTION_PLAN.md](../../EXECUTION_PLAN.md) and [Phase 2 requirements](phase-2.md). This import does not close the existing reminder-delivery acceptance decision. The [human-approval ADR](../adr/course-0001-human-approval-boundary.md) retains its original SRS v1 references.
+> Keep SRS version-qualified FR/SEC/NFR references separate from the engineering AC/P2 identifiers in [EXECUTION_PLAN.md](../../EXECUTION_PLAN.md) and [Phase 2 requirements](phase-2.md). Current-status note (November 22, 2026): under the user's delegated finalization decisions, AC-09 aligns with this SRS's FR17 and the submitted STP: persistent create/edit/cancel reminder metadata for owned approved/manual tasks, clearly labelled as no delivery. Notification delivery is outside this release and retains separate future permission/evidence requirements. This note does not alter the historical imported requirements or fabricate past acceptance. Real-model, four-user, HTTPS and non-developer evidence gaps remain in [P0 evidence](../testing/p0-evidence.md). The [human-approval ADR](../adr/course-0001-human-approval-boundary.md) retains its original SRS v1 references.
 
 **Software Requirements Specification**
 

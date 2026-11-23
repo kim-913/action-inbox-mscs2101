@@ -14,7 +14,9 @@ Calendar idempotency is task-scoped: retries with unchanged immutable event cont
 
 The retention boundary fences every ingestion write by both the original running sync record and the original Google connection ID, under the user-row lock. A newly connected account cannot authorize an old held provider response. Reconnect reconciliation verifies stable user/task provider markers and immutable-content hash, not a discarded request UUID. Revocation accepts a bounded, definitive HTTP 400 `invalid_token` as already revoked; ambiguous transport/provider failure still blocks purge and remains retryable.
 
-Reminder endpoints manage only in-app due metadata, clearly labelled as such. No notification scheduling or delivery success is implemented or claimed; AC-09 remains pending the user's delivery decision.
+November 22 finalization clarification: upcoming Calendar requests also capture the original connection ID before network work. Success and failure persistence both revalidate it under the user-row lock. Stale lifecycle work returns 401 `GOOGLE_RECONNECT_REQUIRED`, altering neither snapshot nor error. Network work stays outside database locks. Authentication encryption explicitly enforces a 16-byte GCM tag while preserving the existing envelope; no migration or key rotation is introduced.
+
+November 22 delegated scope decision: reminder endpoints create, edit and cancel persistent in-app due metadata for owned approved/manual tasks, clearly labelled as no delivery. This is AC-09, aligned with SRS v2.0 FR17 and the submitted STP. Notification delivery is outside this release, not a simulated success or unresolved P0 delivery mechanism; future channels still require separate authorization and evidence.
 
 Runtime composition supplies a PostgreSQL pool, validated deployment configuration, authenticated-user hook, and Google gateway to route modules. Tests inject local HTTP provider servers only at provider URL seams. OAuth/CSRF remains responsible for every authenticated mutation, including calls made through those seams. All installation and verification is centralized after parallel implementation lands.
 
