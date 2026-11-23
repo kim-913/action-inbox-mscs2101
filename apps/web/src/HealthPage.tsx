@@ -89,11 +89,10 @@ export function HealthPage() {
         </div>
         <button
           type="button"
-          disabled={state.status === "loading"}
           onClick={() => void controller.current?.check()}
         >
           {state.status === "loading"
-            ? "Checking…"
+            ? "Restart check"
             : state.status === "connected"
               ? "Check again"
               : "Retry connection"}
