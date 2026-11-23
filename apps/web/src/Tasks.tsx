@@ -91,13 +91,12 @@ export function Tasks({
     },
   ];
   return (
-    <section>
-      <div className="page-heading">
+    <section className="page-tasks">
+      <div className="page-heading tasks-heading">
         <div>
-          <p className="eyebrow">Make room for progress</p>
-          <h1>Your next steps</h1>
+          <h1>Tasks</h1>
           <p className="subtitle">
-            Approved by you. Organized by due date, not an AI score.
+            Manual and approved tasks, organized by due date.
           </p>
           <DisplayRange direction="upcoming" />
         </div>
@@ -111,7 +110,14 @@ export function Tasks({
       {creating && <ManualTask api={api} />}
       <div className="surface task-workspace">
         <div className="section-heading">
-          <h2>Tasks</h2>
+          <div>
+            <h2>Task list</h2>
+            <p className="section-note">
+              {tasks.isPending
+                ? "Loading saved work"
+                : `${orderedTasks.length} ${orderedTasks.length === 1 ? "task" : "tasks"} loaded`}
+            </p>
+          </div>
           <button
             className="secondary small"
             onClick={() => {
@@ -123,7 +129,7 @@ export function Tasks({
             Reload tasks and versions
           </button>
         </div>
-        <label>
+        <label className="task-source-filter">
           Task source
           <select
             value={source}
@@ -264,6 +270,7 @@ function TaskItem({
     >
       <button
         className="task-row"
+        data-source-email={task.sourceEmailId ?? undefined}
         aria-expanded={expanded}
         aria-controls={`task-editor-${task.id}`}
         onClick={onToggle}
@@ -293,6 +300,7 @@ function TaskItem({
           {task.sourceEmailId ? (
             <button
               className="text-button source-link"
+              data-source-email={task.sourceEmailId}
               onClick={() => openEmail(task.sourceEmailId!)}
             >
               View source email and evidence <span aria-hidden="true">→</span>
@@ -398,7 +406,7 @@ export function ManualTask({ api }: { api: ApiClient }) {
           creation, without creating a duplicate.
         </p>
       )}
-      <ActionNotice action={action} />
+      <ActionNotice action={action} pendingMessage="Saving this task…" />
     </form>
   );
 }
@@ -419,7 +427,8 @@ function TaskEditor({ api, task }: { api: ApiClient; task: Task }) {
           const body = {
             version: task.version,
             title: title.trim(),
-            dueAt: isoDate(due),
+            dueAt:
+              due === localDateValue(task.dueAt) ? task.dueAt : isoDate(due),
             status,
           };
           setLocked(true);
@@ -459,7 +468,7 @@ function TaskEditor({ api, task }: { api: ApiClient; task: Task }) {
         To reopen a completed task, choose Pending and save.
       </p>
       <button disabled={action.pending}>Save task</button>
-      <ActionNotice action={action} />
+      <ActionNotice action={action} pendingMessage="Saving task details…" />
     </form>
   );
 }
@@ -493,7 +502,10 @@ function ReminderEditor({
       onSubmit={(event) => {
         event.preventDefault();
         void action.run(async () => {
-          const scheduledAt = isoDate(scheduled);
+          const scheduledAt =
+            reminder && scheduled === localDateValue(reminder.scheduledAt)
+              ? reminder.scheduledAt
+              : isoDate(scheduled);
           if (!scheduledAt)
             throw new Error("Choose an in-app reminder date and time.");
           if (reminder)
@@ -573,7 +585,10 @@ function ReminderEditor({
           </button>
         )}
       </div>
-      <ActionNotice action={action} />
+      <ActionNotice
+        action={action}
+        pendingMessage="Updating reminder metadata…"
+      />
     </form>
   );
 }
@@ -741,7 +756,10 @@ export function EventCreator({
         Approval alone never creates a calendar event. Failed requests retain
         their idempotency key across in-app navigation; retry this same request.
       </p>
-      <ActionNotice action={action} />
+      <ActionNotice
+        action={action}
+        pendingMessage="Creating or checking the confirmed Calendar event…"
+      />
     </form>
   );
 }

@@ -63,6 +63,7 @@ export function Planner({
   const now = useNow();
   const { ready, recent, upcoming, identity } = useDisplayWindow();
   const [source, setSource] = useState<PlannerSource>("all");
+  const [showAllEmails, setShowAllEmails] = useState(false);
   const showGmail = source === "all" || source === "gmail";
   const showTasks = showGmail || source === "manual";
   const showCalendar = source === "all" || source === "calendar";
@@ -253,6 +254,26 @@ export function Planner({
       (canvasConnection.data &&
         (!canvasConnection.data.connected || canvas.data))),
   );
+  const refreshing =
+    (showGmail && (mail.isFetching || proposals.isFetching)) ||
+    (showTasks && tasks.isFetching) ||
+    (showCalendar && connected && calendar.isFetching) ||
+    canvasConnection.isFetching ||
+    (showCanvas && canvas.isFetching);
+  const loading =
+    (showGmail && (mail.isLoading || proposals.isLoading)) ||
+    (showTasks && tasks.isLoading) ||
+    (showCalendar && connected && calendar.isLoading) ||
+    (showCanvas && (canvasConnection.isLoading || canvas.isLoading));
+  const sourceFailed = Boolean(
+    (showGmail && (mail.error || proposals.error)) ||
+    (showTasks && tasks.error) ||
+    (showCalendar && connected && (calendar.error || calendarError)) ||
+    (showCanvas &&
+      (canvasConnection.error || canvasConnection.data?.error || canvas.error)),
+  );
+  const selectedOutsideWindow =
+    selectedDay < upcoming.startDate || selectedDay >= upcoming.endDate;
   function changeWeek(offset: number) {
     setWeekOffset(offset);
     const start = new Date(
@@ -264,20 +285,30 @@ export function Planner({
   }
   return (
     <section aria-labelledby="planner-heading">
-      <div className="page-heading">
-        <div>
-          <p className="eyebrow">Dates, details, next steps</p>
+      <div className="page-heading planner-heading">
+        <time
+          className="planner-date"
+          dateTime={today}
+          aria-label={`Today, ${todayDate.toLocaleDateString(undefined, { dateStyle: "full" })}`}
+        >
+          <span>
+            {todayDate.toLocaleDateString(undefined, { month: "short" })}
+          </span>
+          <strong>{todayDate.getDate()}</strong>
+          <span>
+            {todayDate.toLocaleDateString(undefined, { weekday: "short" })}
+          </span>
+        </time>
+        <div className="planner-heading-copy">
           <h1 id="planner-heading">Planner</h1>
           <p className="subtitle">
-            A connected plan. Review suggested dates; keep approved work moving.
+            Review proposals, manage tasks, and check source dates.
           </p>
         </div>
         <div className="heading-actions">
           <button
             className="secondary"
-            disabled={
-              mail.isFetching || proposals.isFetching || tasks.isFetching
-            }
+            disabled={!ready || refreshing}
             onClick={() => {
               if (showGmail) {
                 void mail.refetch();
@@ -292,7 +323,9 @@ export function Planner({
           >
             Refresh plan
           </button>
-          <button onClick={() => openTask()}>+ New task</button>
+          <button className="planner-create" onClick={() => openTask()}>
+            + New task
+          </button>
         </div>
       </div>
       <div className="source-tabs" role="group" aria-label="Planner sources">
@@ -332,11 +365,16 @@ export function Planner({
                 : observed?.status === "Failed"
                   ? "Last import needs attention"
                   : emails.length
-                    ? `${emails.length} source messages loaded`
+                    ? `${emails.length} source ${emails.length === 1 ? "message" : "messages"} loaded`
                     : "No source messages loaded yet"}
         </span>
         <span className="status-divider" />
-        <span>Canvas: {canvasConnectionLabel(canvasConnection.data)}</span>
+        <span>
+          Canvas:{" "}
+          {!canvasConnection.data && canvasConnection.isError
+            ? "Connection status unavailable"
+            : canvasConnectionLabel(canvasConnection.data)}
+        </span>
         <button className="text-button" onClick={openConnections}>
           Connections
         </button>
@@ -385,14 +423,14 @@ export function Planner({
           </button>
         </details>
       )}
-      <ErrorNotice error={mail.error} />
-      <ErrorNotice error={proposals.error} />
-      <ErrorNotice error={tasks.error} />
+      <ErrorNotice error={showGmail ? mail.error : null} />
+      <ErrorNotice error={showGmail ? proposals.error : null} />
+      <ErrorNotice error={showTasks ? tasks.error : null} />
       <ErrorNotice error={run.error} />
-      <ErrorNotice error={calendar.error} />
+      <ErrorNotice error={showCalendar ? calendar.error : null} />
       <ErrorNotice
         error={
-          calendarError
+          showCalendar && calendarError
             ? new RequestError(
                 calendarError.message,
                 calendarError.code,
@@ -402,7 +440,7 @@ export function Planner({
         }
       />
       <ErrorNotice error={canvasError(canvasConnection.error)} />
-      <ErrorNotice error={canvasError(canvas.error)} />
+      <ErrorNotice error={showCanvas ? canvasError(canvas.error) : null} />
       {canvasConnection.data?.error && (
         <ErrorNotice
           error={canvasError(
@@ -425,13 +463,21 @@ export function Planner({
           {displayDate(canvasConnection.data.lastSuccessfulFetchAt)}.
         </p>
       )}
+      {sourceFailed && (
+        <p className="inline-note" role="status">
+          Some sources could not be refreshed. Available last-success data is
+          still shown; this plan may be incomplete or out of date. Use Refresh
+          plan to retry reads. Canvas feed imports must be retried in
+          Connections.
+        </p>
+      )}
       <div className="planner-metrics">
         <span>
           <strong>{loaded ? overdue : "—"}</strong> overdue tasks
         </span>
         <span>
-          <strong>{loaded ? reviews.length : "—"}</strong> loaded proposals
-          needing review
+          <strong>{loaded ? reviews.length : "—"}</strong> loaded{" "}
+          {reviews.length === 1 ? "proposal" : "proposals"} needing review
         </span>
         <span>
           <strong>{loaded ? undated.length : "—"}</strong> loaded undated items
@@ -450,42 +496,6 @@ export function Planner({
           waiting for reply
         </span>
       </div>
-      {showGmail && (
-        <section className="surface" aria-labelledby="recent-mail-heading">
-          <h2 id="recent-mail-heading">Recent Gmail emails</h2>
-          <DisplayRange direction="recent" />
-          <p className="section-note">
-            {emails.length} emails loaded
-            {mail.hasNextPage ? "; more available" : ""}. Receipt dates are not
-            deadlines. Reading email does not require AI.
-          </p>
-          {mail.isPending && <p role="status">Loading recent emails…</p>}
-          {mail.data && emails.length === 0 && (
-            <p>No saved emails in this recent window.</p>
-          )}
-          {emails.map((email) => (
-            <article className="planner-row" key={email.id}>
-              <h3>{email.subject || "Untitled email"}</h3>
-              <p>
-                {email.sender} · Received {displayDate(email.receivedAt)}
-              </p>
-              <button
-                className="text-button"
-                onClick={() => openEmail(email.id)}
-              >
-                Open email & source →
-              </button>
-            </article>
-          ))}
-          <p className="hint">
-            Last successful Gmail import:{" "}
-            {displayDate(
-              mail.data?.pages[0]?.dataState.lastSuccessfulSyncAt ?? null,
-            )}
-            .
-          </p>
-        </section>
-      )}
       <DisplayRange direction="upcoming" />
       <section
         className="surface week-calendar"
@@ -559,7 +569,8 @@ export function Planner({
                 key={key}
                 className={`week-day ${selectedDay === key ? "selected" : ""} ${today === key ? "is-today" : ""}`}
                 aria-pressed={selectedDay === key}
-                aria-label={`${day.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}, ${items.length} loaded items`}
+                aria-current={today === key ? "date" : undefined}
+                aria-label={`${day.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}, ${items.length} loaded ${items.length === 1 ? "item" : "items"}`}
                 onClick={() => setSelectedDay(key)}
               >
                 <span className="weekday">
@@ -570,6 +581,14 @@ export function Planner({
                   {items.length
                     ? `${items.length} item${items.length === 1 ? "" : "s"}`
                     : "—"}
+                </span>
+                <span className="day-source-marks" aria-hidden="true">
+                  {(["task", "suggestion", "event", "canvas"] as const).map(
+                    (kind) =>
+                      items.some((item) => item.kind === kind) && (
+                        <i key={kind} className={`day-source-mark ${kind}`} />
+                      ),
+                  )}
                 </span>
                 <span className="day-previews">
                   {items.slice(0, 2).map((item) => (
@@ -592,31 +611,48 @@ export function Planner({
               })}
             </h3>
             <span className="count-label">
-              {selectedEntries.length} loaded items
+              {selectedEntries.length} loaded{" "}
+              {selectedEntries.length === 1 ? "item" : "items"}
             </span>
           </div>
-          {!loaded && (
+          {!loaded && loading && (
             <p role="status" className="empty-small">
               Loading your saved plan…
             </p>
           )}
-          {loaded && selectedEntries.length === 0 && (
+          {selectedOutsideWindow ? (
             <p className="empty-small">
-              No dated items for this day in the loaded plan.
-              {more
-                ? " More source pages are available below."
-                : " See What’s next or Needs a date below."}
+              This day is outside the saved display window. Choose Today or
+              change the display window to see matching dates.
             </p>
+          ) : (
+            loaded &&
+            !sourceFailed &&
+            selectedEntries.length === 0 && (
+              <p className="empty-small">
+                No dated items for this day in the loaded plan.
+                {more
+                  ? " More source pages are available below."
+                  : " See What’s next or Needs a date below."}
+              </p>
+            )
           )}
-          {selectedEntries.map((item) => (
-            <PlannerRow
-              key={item.key}
-              item={item}
-              now={now}
-              openEmail={openEmail}
-              openTask={openTask}
-            />
-          ))}
+          <div
+            className="planner-scroll"
+            role="region"
+            aria-label="Selected day items"
+            tabIndex={selectedEntries.length ? 0 : undefined}
+          >
+            {selectedEntries.map((item) => (
+              <PlannerRow
+                key={item.key}
+                item={item}
+                now={now}
+                openEmail={openEmail}
+                openTask={openTask}
+              />
+            ))}
+          </div>
         </div>
       </section>
       <div className="planner-bottom">
@@ -643,15 +679,22 @@ export function Planner({
               </button>
             </div>
           )}
-          {scheduled.map((item) => (
-            <PlannerRow
-              key={item.key}
-              item={item}
-              now={now}
-              openEmail={openEmail}
-              openTask={openTask}
-            />
-          ))}
+          <div
+            className="planner-scroll"
+            role="region"
+            aria-label="Upcoming loaded items"
+            tabIndex={scheduled.length ? 0 : undefined}
+          >
+            {scheduled.map((item) => (
+              <PlannerRow
+                key={item.key}
+                item={item}
+                now={now}
+                openEmail={openEmail}
+                openTask={openTask}
+              />
+            ))}
+          </div>
         </section>
         <section className="surface" aria-labelledby="needs-date-heading">
           <div className="section-heading">
@@ -668,26 +711,96 @@ export function Planner({
               undated coursework through its calendar feed.
             </p>
           )}
-          {undated.map((item) => (
-            <PlannerRow
-              key={item.key}
-              item={item}
-              now={now}
-              openEmail={openEmail}
-              openTask={openTask}
-            />
-          ))}
+          <div
+            className="planner-scroll"
+            role="region"
+            aria-label="Undated loaded items"
+            tabIndex={undated.length ? 0 : undefined}
+          >
+            {undated.map((item) => (
+              <PlannerRow
+                key={item.key}
+                item={item}
+                now={now}
+                openEmail={openEmail}
+                openTask={openTask}
+              />
+            ))}
+          </div>
         </section>
       </div>
+      {showGmail && (
+        <section className="surface" aria-labelledby="recent-mail-heading">
+          <h2 id="recent-mail-heading">Recent Gmail emails</h2>
+          <DisplayRange direction="recent" />
+          <p className="section-note">
+            {emails.length} emails loaded
+            {mail.hasNextPage ? "; more available" : ""}. Receipt dates are not
+            deadlines. Reading email does not require AI.
+          </p>
+          {mail.isPending && <p role="status">Loading recent emails…</p>}
+          {mail.data && emails.length === 0 && (
+            <p>No saved emails in this recent window.</p>
+          )}
+          <div
+            className="planner-scroll"
+            role="region"
+            aria-label="Loaded recent emails"
+            tabIndex={emails.length ? 0 : undefined}
+          >
+            {(showAllEmails ? emails : emails.slice(0, 5)).map((email) => (
+              <article className="planner-row" key={email.id}>
+                <h3>{email.subject || "Untitled email"}</h3>
+                <p>
+                  {email.sender} · Received {displayDate(email.receivedAt)}
+                </p>
+                <button
+                  className="text-button"
+                  data-source-email={email.id}
+                  onClick={() => openEmail(email.id)}
+                >
+                  {"Open email & source →"}
+                </button>
+              </article>
+            ))}
+          </div>
+          {emails.length > 5 && (
+            <div className="actions">
+              <p className="section-note" role="status">
+                Showing {showAllEmails ? emails.length : 5} of {emails.length}{" "}
+                loaded emails.
+              </p>
+              <button
+                className="secondary small"
+                aria-expanded={showAllEmails}
+                onClick={() => setShowAllEmails((value) => !value)}
+              >
+                {showAllEmails
+                  ? "Show recent email preview"
+                  : "Show all loaded emails"}
+              </button>
+            </div>
+          )}
+          <p className="hint">
+            Last successful Gmail import:{" "}
+            {displayDate(
+              mail.data?.pages[0]?.dataState.lastSuccessfulSyncAt ?? null,
+            )}
+            .
+          </p>
+        </section>
+      )}
       <div className="loaded-boundary">
         <p>
           {scheduled.length} dated planner entries loaded for the selected
           source; {undated.length} undated entries loaded separately. These are
           loaded counts, not source-wide totals; total matching counts are not
           supplied by these APIs.{" "}
-          {more
-            ? "This is a partial plan; load more sources to include their dates."
-            : "All returned pages are loaded; Calendar remains a provider-bounded snapshot."}
+          {!loaded || sourceFailed
+            ? "Source coverage is incomplete or not current; successful data remains visible."
+            : more
+              ? "This is a partial plan; load more sources to include their dates."
+              : "All returned pages are loaded; Calendar remains a provider-bounded snapshot."}
           {showCalendar && (
             <>
               {" "}
@@ -845,9 +958,10 @@ function PlannerRow({
         {item.kind === "suggestion" ? (
           <button
             className="text-button"
+            data-source-email={item.source.id}
             onClick={() => openEmail(item.source.id)}
           >
-            Review source & actions →
+            {"Review source & actions →"}
           </button>
         ) : item.kind === "task" ? (
           <>
@@ -860,6 +974,7 @@ function PlannerRow({
             {item.task.sourceEmailId && (
               <button
                 className="text-button"
+                data-source-email={item.task.sourceEmailId}
                 onClick={() => openEmail(item.task.sourceEmailId!)}
               >
                 Source email

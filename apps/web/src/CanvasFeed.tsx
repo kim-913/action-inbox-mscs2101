@@ -84,7 +84,16 @@ export function CanvasConnectionCard({ api }: { api: ApiClient }) {
       await cache.invalidateQueries({ queryKey: ["private", "canvas"] });
     }
   }
-  const safeAction = { ...action, error: canvasError(action.error) };
+  const actionError = canvasError(action.error);
+  const repeatsSourceError =
+    actionError &&
+    state?.error &&
+    actionError.code === state.error.code &&
+    actionError.requestId === state.error.requestId;
+  const safeAction = {
+    ...action,
+    error: repeatsSourceError ? null : actionError,
+  };
   return (
     <article
       className="surface connection-card canvas-connection"
@@ -92,7 +101,9 @@ export function CanvasConnectionCard({ api }: { api: ApiClient }) {
     >
       <div className="section-heading">
         <span className={`pill ${state?.connected ? "canvas" : "neutral"}`}>
-          {canvasConnectionLabel(state)}
+          {!state && connection.isError
+            ? "Connection status unavailable"
+            : canvasConnectionLabel(state)}
         </span>
         <span className="category-label">Sofia Canvas</span>
       </div>
@@ -304,7 +315,10 @@ export function CanvasConnectionCard({ api }: { api: ApiClient }) {
           </div>
         </section>
       )}
-      <ActionNotice action={safeAction} />
+      <ActionNotice
+        action={safeAction}
+        pendingMessage="Updating the Canvas connection…"
+      />
     </article>
   );
 }

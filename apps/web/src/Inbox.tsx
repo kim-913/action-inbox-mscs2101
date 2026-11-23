@@ -106,10 +106,10 @@ export function Inbox({
       (email) => email.extractionError?.code === "PROVIDER_NOT_CONFIGURED",
     );
   return (
-    <section aria-labelledby="inbox-heading">
-      <div className="page-heading">
+    <section className="page-inbox" aria-labelledby="inbox-heading">
+      <div className="page-heading inbox-heading">
         <div>
-          <p className="eyebrow">Connected sources</p>
+          <span className="pill neutral">Gmail · read only</span>
           <h1 id="inbox-heading">Inbox</h1>
           <p className="subtitle">
             Read the original message. Review its suggested actions and
@@ -134,25 +134,28 @@ export function Inbox({
               suggestions.
             </p>
           </div>
-          <span className="count-label">{messages.length} loaded</span>
+          <span className="count-label inbox-count">
+            <strong>{inbox.isPending ? "—" : messages.length}</strong> loaded
+            messages
+          </span>
         </div>
-        <div className="sync-strip">
+        <div className="sync-strip" data-active={running && !pollingPaused}>
           <span
             className={`status-dot ${running && !pollingPaused ? "working" : currentRun?.status === "Failed" ? "attention" : ""}`}
             aria-hidden="true"
           />
-          <span className="sync-copy">
+          <span className="sync-copy" role="status" aria-live="polite">
             <strong>
               {pollingPaused
                 ? "Progress checks paused"
                 : running
-                  ? "Importing & preparing suggestions"
+                  ? "Import in progress"
                   : currentRun?.status === "Failed"
                     ? extractionUnavailable
                       ? "Emails imported · suggestions unavailable"
                       : "Last sync needs attention"
                     : currentRun?.status === "Succeeded"
-                      ? "Inbox is up to date"
+                      ? "Last sync completed"
                       : "Connect your mail, then sync when you’re ready"}
             </strong>
             {currentRun && (
@@ -238,7 +241,10 @@ export function Inbox({
             available.
           </p>
         )}
-        <ActionNotice action={action} />
+        <ActionNotice
+          action={action}
+          pendingMessage="Requesting Gmail import…"
+        />
         <ErrorNotice error={run.error} />
         <ErrorNotice error={inbox.error} />
         {(extractionUnavailable || unavailable > 0) && (
@@ -295,6 +301,7 @@ export function Inbox({
                   </div>
                   <button
                     className="mail-subject"
+                    data-source-email={email.id}
                     onClick={() => openEmail(email.id)}
                   >
                     {email.subject || "(No subject)"}
@@ -322,6 +329,7 @@ export function Inbox({
                 <button
                   className="open-mail"
                   aria-label={`Open source: ${email.subject || "No subject"}`}
+                  data-source-email={email.id}
                   onClick={() => openEmail(email.id)}
                 >
                   <span aria-hidden="true">→</span>
@@ -351,11 +359,13 @@ export function EmailDetail({ api, id }: { api: ApiClient; id: string }) {
       api.request(route(apiRoutes.email, id), emailResponseSchema, { signal }),
   });
   return (
-    <section>
-      <div className="page-heading">
+    <section className="page-source">
+      <div className="page-heading source-page-heading">
         <div>
-          <p className="eyebrow">Read. Review. Decide.</p>
-          <h1>Source email and review</h1>
+          <h1 tabIndex={-1}>Source email and review</h1>
+          <p className="subtitle">
+            Compare the original message with each proposed action.
+          </p>
         </div>
         <button
           className="secondary"
@@ -366,7 +376,11 @@ export function EmailDetail({ api, id }: { api: ApiClient; id: string }) {
         </button>
       </div>
       <ErrorNotice error={email.error} />
-      {email.isPending && <p role="status">Loading source…</p>}
+      {email.isPending && (
+        <p className="loading-state" role="status">
+          Loading source…
+        </p>
+      )}
       {email.data && (
         <div className="source-layout">
           <article className="surface source-card">
@@ -389,12 +403,25 @@ export function EmailDetail({ api, id }: { api: ApiClient; id: string }) {
           </article>
           <aside className="review-column" aria-label="Suggested actions">
             <div className="review-intro">
-              <h2>Your call, always.</h2>
+              <h2>Review suggested actions</h2>
               <p>
                 Check the quotes. Adjust the details. Nothing becomes a task or
                 calendar event without your decision.
               </p>
             </div>
+            <p
+              className="extraction-state"
+              data-state={email.data.extractionStatus}
+              role="status"
+            >
+              <strong>Extraction: {email.data.extractionStatus}</strong>
+              <span>
+                {email.data.suggestions.length} saved{" "}
+                {email.data.suggestions.length === 1
+                  ? "suggestion"
+                  : "suggestions"}
+              </span>
+            </p>
             {email.data.suggestions.map((suggestion) => (
               <SuggestionReview
                 key={`${suggestion.id}:${suggestion.version}`}
@@ -465,15 +492,18 @@ export function SuggestionReview({
       async () => {
         if (!title.trim() && kind !== "reject")
           throw new Error("Enter a title before saving or approving.");
-        setIntent(kind);
         const body =
           kind === "reject"
             ? { version: suggestion.version }
             : {
                 version: suggestion.version,
                 title: title.trim(),
-                dueAt: isoDate(due),
+                dueAt:
+                  due === localDateValue(suggestion.dueAt)
+                    ? suggestion.dueAt
+                    : isoDate(due),
               };
+        setIntent(kind);
         if (kind === "approve")
           await api.request(
             route(apiRoutes.approve, suggestion.id),
@@ -535,7 +565,11 @@ export function SuggestionReview({
       )}
       <div className="proposed-date">
         <span className="pill neutral">
-          Unconfirmed · {dueUrgency(suggestion.dueAt, now).label}
+          {suggestion.reviewState === "Approved"
+            ? "Approved proposal"
+            : "Unconfirmed"}
+          {" · "}
+          {dueUrgency(suggestion.dueAt, now).label}
         </span>
         <p>
           Proposed due: {displayDate(suggestion.dueAt)}
@@ -603,7 +637,16 @@ export function SuggestionReview({
               source and versions to reconcile before making a different change.
             </p>
           )}
-          <ActionNotice action={action} />
+          <ActionNotice
+            action={action}
+            pendingMessage={
+              intent === "approve"
+                ? "Approving task…"
+                : intent === "reject"
+                  ? "Rejecting suggestion…"
+                  : "Saving suggestion edits…"
+            }
+          />
         </form>
       )}
     </article>

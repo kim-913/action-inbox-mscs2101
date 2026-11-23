@@ -343,6 +343,10 @@ describe("private Canvas calendar subscription", () => {
         ).disabled,
       ).toBe(false),
     );
+    const connectionCard = screen
+      .getByRole("heading", { name: "Canvas calendar subscription" })
+      .closest("article")!;
+    expect(within(connectionCard).getAllByRole("alert")).toHaveLength(1);
     fireEvent.click(
       screen.getByRole("button", { name: "Refresh Canvas feed" }),
     );
@@ -353,6 +357,7 @@ describe("private Canvas calendar subscription", () => {
     expect(
       within(next).getAllByRole("heading", { name: entry.title }),
     ).toHaveLength(1);
+    expect(within(connectionCard).queryByRole("alert")).toBeNull();
     const writes = fetcher.mock.calls.filter(
       (call) => call[1]?.method !== "GET",
     );

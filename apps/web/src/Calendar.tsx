@@ -21,24 +21,32 @@ export function Calendar({ api }: { api: ApiClient }) {
   });
   const providerError = calendar.data?.error;
   return (
-    <section>
-      <h1>Upcoming Google Calendar events</h1>
-      <DisplayRange direction="upcoming" />
-      <p>
-        Events are created only from an approved or manual task with your
-        explicit confirmation in Tasks.
-      </p>
-      <p className="section-note">
-        Bounded provider snapshot: at most 100 Google Calendar events. This is
-        not a complete calendar history; events overlapping the selected window
-        are shown, including all-day events in their source dates.
-      </p>
-      <button
-        onClick={() => void calendar.refetch()}
-        disabled={!ready || calendar.isFetching}
-      >
-        {calendar.isFetching ? "Refreshing…" : "Refresh calendar"}
-      </button>
+    <section className="page-calendar">
+      <div className="page-heading calendar-page-heading">
+        <div>
+          <span className="pill event">Google Calendar · read only</span>
+          <h1>Upcoming Google Calendar events</h1>
+          <DisplayRange direction="upcoming" />
+        </div>
+        <button
+          className="secondary"
+          onClick={() => void calendar.refetch()}
+          disabled={!ready || calendar.isFetching}
+        >
+          {calendar.isFetching ? "Refreshing…" : "Refresh calendar"}
+        </button>
+      </div>
+      <div className="calendar-context">
+        <p>
+          Events are created only from an approved or manual task with your
+          explicit confirmation in Tasks.
+        </p>
+        <p className="section-note">
+          Bounded provider snapshot: at most 100 Google Calendar events. This is
+          not a complete calendar history; events overlapping the selected
+          window are shown, including all-day events in their source dates.
+        </p>
+      </div>
       <ErrorNotice error={calendar.error} />
       <ErrorNotice
         error={
@@ -57,18 +65,27 @@ export function Calendar({ api }: { api: ApiClient }) {
           retry; existing events have not been discarded.
         </p>
       )}
-      <p>
+      <p className="calendar-freshness">
         Last successful fetch:{" "}
         {displayDate(calendar.data?.lastSuccessfulFetchAt ?? null)}
       </p>
-      {calendar.isPending && <p role="status">Loading calendar…</p>}
+      {calendar.isPending && (
+        <p className="loading-state" role="status">
+          Loading calendar…
+        </p>
+      )}
       {calendar.data?.items.length === 0 && (
-        <p>No events overlap this window in the available provider snapshot.</p>
+        <p className="empty-state">
+          No events overlap this window in the available provider snapshot.
+        </p>
       )}
       {calendar.data?.items.map((event) => {
         const external = safeExternalLink(event.htmlLink);
         return (
-          <article className="panel" key={event.id}>
+          <article className="panel calendar-event" key={event.id}>
+            <span className="pill event">
+              {event.allDay ? "All-day event" : "Timed event"}
+            </span>
             <h2>{event.title || "(Untitled event)"}</h2>
             <p>
               {event.allDay
