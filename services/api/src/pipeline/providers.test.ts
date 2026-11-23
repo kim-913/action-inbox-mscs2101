@@ -191,6 +191,44 @@ describe("OpenAI Responses HTTP contract", () => {
       ).extract(input),
     ).rejects.toMatchObject({ code: "PROVIDER_NOT_CONFIGURED" });
   });
+  it.each([
+    ["empty text", ""],
+    ["malformed JSON", '{"category":'],
+    ["missing fields", '{"category":"Reference"}'],
+    [
+      "wrong types",
+      '{"category":"Reference","categoryConfidence":"high","actions":[]}',
+    ],
+  ])("rejects %s instead of inventing extraction", async (_label, text) => {
+    const base = await provider((_request, response) => {
+      response.setHeader("content-type", "application/json");
+      response.end(
+        JSON.stringify({
+          id: "resp_local",
+          status: "completed",
+          output: [
+            {
+              id: "msg_local",
+              type: "message",
+              role: "assistant",
+              status: "completed",
+              content: [{ type: "output_text", text, annotations: [] }],
+            },
+          ],
+        }),
+      );
+    });
+    await expect(
+      new OpenAIExtractor(
+        "local-test-key",
+        `${base}/v1`,
+        "local-contract",
+      ).extract(input),
+    ).rejects.toMatchObject({
+      code: "AI_UNAVAILABLE",
+      message: "AI extraction could not complete. Retry synchronization.",
+    });
+  });
   it("fails closed on malformed structured output", async () => {
     const base = await provider((_request, response) => {
       response.setHeader("content-type", "application/json");

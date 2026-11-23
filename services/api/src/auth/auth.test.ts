@@ -9,6 +9,7 @@ import { sessionResponseSchema } from "@action-inbox/contracts";
 import { readConfiguration } from "../config.js";
 import { migrate } from "../db/migrate.js";
 import { registerPipeline } from "../pipeline/index.js";
+import { registerAccount } from "../domain/account.js";
 import {
   ApiFailure,
   authenticatedUser,
@@ -93,6 +94,7 @@ describe.skipIf(!databaseUrl)(
         return pipeline.enqueue(client, userId);
       });
       const pipeline = await registerPipeline(app, { pool, config, ...auth });
+      registerAccount(app, { pool, config, ...auth });
       app.addHook("onClose", () => pipeline.close());
       google = auth.google;
       app.post("/protected", { preHandler: auth.requireUser }, (request) => ({
@@ -443,6 +445,49 @@ describe.skipIf(!databaseUrl)(
       expect((await mutation(next, "/v1/auth/logout")).statusCode).toBe(200);
       expect((await mutation(next, "/protected")).statusCode).toBe(401);
     });
+
+    it.each(["disconnect", "delete"] as const)(
+      "removes pending session-bound OAuth state on account %s without consuming another browser's state",
+      async (operation) => {
+        const { current, userId } = await login();
+        const pending = await start(current);
+        const other = await browser();
+        const unrelated = await start(other);
+        const exchangeCalls = providerState.exchangeCalls;
+        const response =
+          operation === "disconnect"
+            ? await mutation(current, "/v1/connections/google/disconnect")
+            : await app.inject({
+                method: "DELETE",
+                url: "/v1/account/data",
+                headers: {
+                  cookie: current.cookie,
+                  origin: config.webOrigin,
+                  "x-csrf-token": current.csrf,
+                },
+              });
+        expect(response.statusCode).toBe(200);
+        expect(
+          (
+            await pool.query(
+              "SELECT state_hash FROM oauth_states WHERE state_hash=ANY($1::text[])",
+              [[sha256(pending.state), sha256(unrelated.state)]],
+            )
+          ).rows,
+        ).toEqual([{ state_hash: sha256(unrelated.state) }]);
+        expect((await mutation(current, "/protected")).statusCode).toBe(401);
+        expect((await callback(current, pending)).statusCode).toBe(303);
+        expect(providerState.exchangeCalls).toBe(exchangeCalls);
+        expect(
+          (
+            await pool.query(
+              "SELECT id FROM google_connections WHERE user_id=$1",
+              [userId],
+            )
+          ).rowCount,
+        ).toBe(0);
+      },
+    );
 
     it("keeps the Google subject after disconnect removes the credential connection", async () => {
       const { current, userId } = await login();
